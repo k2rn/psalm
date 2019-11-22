@@ -27,9 +27,9 @@ class ArrayReverseReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRetur
         $first_arg = $call_args[0]->value ?? null;
 
         $first_arg_array = $first_arg
-            && isset($first_arg->inferredType)
-            && $first_arg->inferredType->hasType('array')
-            && ($array_atomic_type = $first_arg->inferredType->getTypes()['array'])
+            && ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg))
+            && $first_arg_type->hasType('array')
+            && ($array_atomic_type = $first_arg_type->getTypes()['array'])
             && ($array_atomic_type instanceof Type\Atomic\TArray
                 || $array_atomic_type instanceof Type\Atomic\ObjectLike
                 || $array_atomic_type instanceof Type\Atomic\TList)
@@ -48,7 +48,9 @@ class ArrayReverseReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRetur
             $second_arg = $call_args[1]->value ?? null;
 
             if (!$second_arg
-                || (isset($second_arg->inferredType) && $second_arg->inferredType->isFalse())
+                || (($second_arg_type = \Psalm\Type\Provider::getNodeType($second_arg))
+                    && $second_arg_type->isFalse()
+                )
             ) {
                 return new Type\Union([clone $first_arg_array]);
             }

@@ -35,8 +35,8 @@ class PreventFloatAssignmentChecker implements AfterExpressionAnalysisInterface
         array &$file_replacements = []
     ) {
         if ($expr instanceof PhpParser\Node\Expr\Assign
-            && isset($expr->inferredType)
-            && $expr->inferredType->hasFloat()
+            && ($expr_type = \Psalm\Type\Provider::getNodeType($expr))
+            && $expr_type->hasFloat()
         ) {
             if (\Psalm\IssueBuffer::accepts(
                 new NoFloatAssignment(

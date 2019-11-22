@@ -40,8 +40,8 @@ class PdoStatementSetFetchMode implements \Psalm\Plugin\Hook\MethodParamsProvide
                 return;
             }
 
-            if (isset($call_args[0]->value->inferredType)
-                && $call_args[0]->value->inferredType->isSingleIntLiteral()
+            if (($first_call_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+                && $first_call_arg_type->isSingleIntLiteral()
             ) {
                 $params = [
                     new \Psalm\Storage\FunctionLikeParameter(
@@ -54,7 +54,7 @@ class PdoStatementSetFetchMode implements \Psalm\Plugin\Hook\MethodParamsProvide
                     ),
                 ];
 
-                $value = $call_args[0]->value->inferredType->getSingleIntLiteral()->value;
+                $value = $first_call_arg_type->getSingleIntLiteral()->value;
 
                 switch ($value) {
                     case \PDO::FETCH_COLUMN:

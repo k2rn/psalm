@@ -37,11 +37,11 @@ class ArrayMergeReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnT
         $all_nonempty_lists = true;
 
         foreach ($call_args as $call_arg) {
-            if (!isset($call_arg->value->inferredType)) {
+            if (!($call_arg_type = \Psalm\Type\Provider::getNodeType($call_arg->value))) {
                 return Type::getArray();
             }
 
-            foreach ($call_arg->value->inferredType->getTypes() as $type_part) {
+            foreach ($call_arg_type->getTypes() as $type_part) {
                 if ($call_arg->unpack) {
                     if (!$type_part instanceof Type\Atomic\TArray) {
                         if ($type_part instanceof Type\Atomic\ObjectLike) {

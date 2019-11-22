@@ -321,13 +321,13 @@ class TernaryAnalyzer
         $lhs_type = null;
 
         if ($stmt->if) {
-            if (isset($stmt->if->inferredType)) {
-                $lhs_type = $stmt->if->inferredType;
+            if ($stmt_if_type = \Psalm\Type\Provider::getNodeType($stmt->if)) {
+                $lhs_type = $stmt_if_type;
             }
-        } elseif (isset($stmt->cond->inferredType)) {
+        } elseif ($stmt_cond_type = \Psalm\Type\Provider::getNodeType($stmt->cond)) {
             $if_return_type_reconciled = AssertionReconciler::reconcile(
                 '!falsy',
-                clone $stmt->cond->inferredType,
+                clone $stmt_cond_type,
                 '',
                 $statements_analyzer,
                 $context->inside_loop,
@@ -339,10 +339,10 @@ class TernaryAnalyzer
             $lhs_type = $if_return_type_reconciled;
         }
 
-        if (!$lhs_type || !isset($stmt->else->inferredType)) {
-            $stmt->inferredType = Type::getMixed();
+        if ($lhs_type && ($stmt_else_type = \Psalm\Type\Provider::getNodeType($stmt->else))) {
+            \Psalm\Type\Provider::setNodeType($stmt, Type::combineUnionTypes($lhs_type, $stmt_else_type));
         } else {
-            $stmt->inferredType = Type::combineUnionTypes($lhs_type, $stmt->else->inferredType);
+            \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
         }
 
         return null;

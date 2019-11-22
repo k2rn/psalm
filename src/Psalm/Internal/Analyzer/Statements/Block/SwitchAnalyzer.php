@@ -270,7 +270,10 @@ class SwitchAnalyzer
 
             $case_context->inside_conditional = false;
 
-            $switch_condition = clone $stmt->cond;
+            $traverser = new PhpParser\NodeTraverser;
+            $traverser->addVisitor(new \Psalm\Internal\Visitor\ConditionCloningVisitor);
+            /** @var PhpParser\Node\Expr */
+            $switch_condition = $traverser->traverse([$stmt->cond])[0];
 
             if ($switch_condition instanceof PhpParser\Node\Expr\Variable
                 && is_string($switch_condition->name)
@@ -310,11 +313,11 @@ class SwitchAnalyzer
                 }
             }
 
-            if (isset($switch_condition->inferredType)
-                && isset($case->cond->inferredType)
-                && (($switch_condition->inferredType->isString() && $case->cond->inferredType->isString())
-                    || ($switch_condition->inferredType->isInt() && $case->cond->inferredType->isInt())
-                    || ($switch_condition->inferredType->isFloat() && $case->cond->inferredType->isFloat())
+            if (($switch_condition_type = \Psalm\Type\Provider::getNodeType($switch_condition))
+                && ($case_cond_type = \Psalm\Type\Provider::getNodeType($case->cond))
+                && (($switch_condition_type->isString() && $case_cond_type->isString())
+                    || ($switch_condition_type->isInt() && $case_cond_type->isInt())
+                    || ($switch_condition_type->isFloat() && $case_cond_type->isFloat())
                 )
             ) {
                 $case_equality_expr = new PhpParser\Node\Expr\BinaryOp\Identical(
@@ -415,7 +418,9 @@ class SwitchAnalyzer
                 $case_equality_expr,
                 $context->self,
                 $statements_analyzer,
-                $codebase
+                $codebase,
+                false,
+                false
             );
         }
 

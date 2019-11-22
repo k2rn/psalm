@@ -24,9 +24,8 @@ class ArrayFillReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnTy
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
-        $first_arg_type = $call_args[0]->value->inferredType ?? null;
-
-        $third_arg_type = $call_args[2]->value->inferredType ?? null;
+        $first_arg_type = isset($call_args[0]) ? \Psalm\Type\Provider::getNodeType($call_args[0]->value) : null;
+        $third_arg_type = isset($call_args[2]) ? \Psalm\Type\Provider::getNodeType($call_args[2]->value) : null;
 
         if ($third_arg_type) {
             if ($first_arg_type

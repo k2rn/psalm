@@ -67,13 +67,16 @@ class IncludeAnalyzer
             $context->inside_call = false;
         }
 
+        $stmt_expr_type = null;
+
         if ($stmt->expr instanceof PhpParser\Node\Scalar\String_
-            || (isset($stmt->expr->inferredType) && $stmt->expr->inferredType->isSingleStringLiteral())
+            || (($stmt_expr_type = \Psalm\Type\Provider::getNodeType($stmt->expr))
+                && $stmt_expr_type->isSingleStringLiteral())
         ) {
             if ($stmt->expr instanceof PhpParser\Node\Scalar\String_) {
                 $path_to_file = $stmt->expr->value;
             } else {
-                $path_to_file = $stmt->expr->inferredType->getSingleStringLiteral()->value;
+                $path_to_file = $stmt_expr_type->getSingleStringLiteral()->value;
             }
 
             $path_to_file = str_replace('/', DIRECTORY_SEPARATOR, $path_to_file);
@@ -228,15 +231,16 @@ class IncludeAnalyzer
             return $stmt->value;
         }
 
-        if (isset($stmt->inferredType) && $stmt->inferredType->isSingleStringLiteral()) {
+        if (($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) && $stmt_type->isSingleStringLiteral()) {
             if (DIRECTORY_SEPARATOR !== '/') {
                 return str_replace(
                     '/',
                     DIRECTORY_SEPARATOR,
-                    $stmt->inferredType->getSingleStringLiteral()->value
+                    $stmt_type->getSingleStringLiteral()->value
                 );
             }
-            return $stmt->inferredType->getSingleStringLiteral()->value;
+
+            return $stmt_type->getSingleStringLiteral()->value;
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\ArrayDimFetch) {

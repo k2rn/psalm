@@ -115,7 +115,7 @@ class PropertyAssignmentAnalyzer
                 return false;
             }
 
-            $lhs_type = isset($stmt->var->inferredType) ? $stmt->var->inferredType : null;
+            $lhs_type = \Psalm\Type\Provider::getNodeType($stmt->var);
 
             if ($lhs_type === null) {
                 return null;
@@ -623,9 +623,11 @@ class PropertyAssignmentAnalyzer
                             true
                         );
 
-                        $property_pure_compatible = isset($stmt->var->inferredType)
-                            && $stmt->var->inferredType->external_mutation_free
-                            && !$stmt->var->inferredType->mutation_free;
+                        $stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var);
+
+                        $property_pure_compatible = $stmt_var_type
+                            && $stmt_var_type->external_mutation_free
+                            && !$stmt_var_type->mutation_free;
 
                         if ($appearing_property_class
                             && !($context->self
@@ -1066,7 +1068,7 @@ class PropertyAssignmentAnalyzer
             $statements_analyzer
         );
 
-        $fq_class_name = (string)$stmt->class->inferredType;
+        $fq_class_name = (string) \Psalm\Type\Provider::getNodeType($stmt->class);
 
         $codebase = $statements_analyzer->getCodebase();
 

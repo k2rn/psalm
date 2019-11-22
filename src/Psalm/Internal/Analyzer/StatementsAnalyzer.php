@@ -555,10 +555,10 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                     ExpressionAnalyzer::analyze($this, $expr, $context);
                     $context->inside_call = false;
 
-                    if (isset($expr->inferredType)) {
+                    if ($expr_type = \Psalm\Type\Provider::getNodeType($expr)) {
                         if (CallAnalyzer::checkFunctionArgumentType(
                             $this,
-                            $expr->inferredType,
+                            $expr_type,
                             Type::getString(),
                             null,
                             'echo',
@@ -699,13 +699,13 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                     if ($prop->default) {
                         ExpressionAnalyzer::analyze($this, $prop->default, $context);
 
-                        if (isset($prop->default->inferredType)) {
+                        if ($prop_default_type = \Psalm\Type\Provider::getNodeType($prop->default)) {
                             if (PropertyAssignmentAnalyzer::analyzeInstance(
                                 $this,
                                 $prop,
                                 $prop->name->name,
                                 $prop->default,
-                                $prop->default->inferredType,
+                                $prop_default_type,
                                 $context
                             ) === false) {
                                 // fall through
@@ -727,11 +727,13 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 foreach ($stmt->consts as $const) {
                     ExpressionAnalyzer::analyze($this, $const->value, $context);
 
-                    if (isset($const->value->inferredType) && !$const->value->inferredType->hasMixed()) {
+                    if (($const_type = \Psalm\Type\Provider::getNodeType($const->value))
+                        && !$const_type->hasMixed()
+                    ) {
                         $codebase->classlikes->setConstantType(
                             (string)$this->getFQCLN(),
                             $const->name->name,
-                            $const->value->inferredType,
+                            $const_type,
                             $const_visibility
                         );
                     }
@@ -1489,17 +1491,17 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 }
 
                 if ($comment_type
-                    && isset($var->default->inferredType)
+                    && ($var_default_type = \Psalm\Type\Provider::getNodeType($var->default))
                     && !TypeAnalyzer::isContainedBy(
                         $codebase,
-                        $var->default->inferredType,
+                        $var_default_type,
                         $comment_type
                     )
                 ) {
                     if (IssueBuffer::accepts(
                         new \Psalm\Issue\ReferenceConstraintViolation(
                             $var_id . ' of type ' . $comment_type->getId() . ' cannot be assigned type '
-                                . $var->default->inferredType->getId(),
+                                . $var_default_type->getId(),
                             new CodeLocation($this, $var)
                         )
                     )) {
@@ -1604,7 +1606,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 return Type::getInt();
             }
 
-            $stmt->left->inferredType = self::getSimpleType(
+            $stmt_left_type = self::getSimpleType(
                 $codebase,
                 $stmt->left,
                 $aliases,
@@ -1612,7 +1614,8 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 $existing_class_constants,
                 $fq_classlike_name
             );
-            $stmt->right->inferredType = self::getSimpleType(
+
+            $stmt_right_type = self::getSimpleType(
                 $codebase,
                 $stmt->right,
                 $aliases,
@@ -1621,15 +1624,25 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 $fq_classlike_name
             );
 
-            if (!$stmt->left->inferredType || !$stmt->right->inferredType) {
+            if (!$stmt_left_type || !$stmt_right_type) {
                 return null;
             }
 
-            if ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Plus ||
-                $stmt instanceof PhpParser\Node\Expr\BinaryOp\Minus ||
-                $stmt instanceof PhpParser\Node\Expr\BinaryOp\Mod ||
-                $stmt instanceof PhpParser\Node\Expr\BinaryOp\Mul ||
-                $stmt instanceof PhpParser\Node\Expr\BinaryOp\Pow
+            \Psalm\Type\Provider::setNodeType(
+                $stmt->left,
+                $stmt_left_type
+            );
+
+            \Psalm\Type\Provider::setNodeType(
+                $stmt->right,
+                $stmt_right_type
+            );
+
+            if ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Plus
+                || $stmt instanceof PhpParser\Node\Expr\BinaryOp\Minus
+                || $stmt instanceof PhpParser\Node\Expr\BinaryOp\Mod
+                || $stmt instanceof PhpParser\Node\Expr\BinaryOp\Mul
+                || $stmt instanceof PhpParser\Node\Expr\BinaryOp\Pow
             ) {
                 BinaryOpAnalyzer::analyzeNonDivArithmeticOp(
                     $file_source instanceof StatementsSource ? $file_source : null,
@@ -1647,8 +1660,8 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
             }
 
             if ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Div
-                && ($stmt->left->inferredType->hasInt() || $stmt->left->inferredType->hasFloat())
-                && ($stmt->right->inferredType->hasInt() || $stmt->right->inferredType->hasFloat())
+                && ($stmt_left_type->hasInt() || $stmt_left_type->hasFloat())
+                && ($stmt_right_type->hasInt() || $stmt_right_type->hasFloat())
             ) {
                 return Type::combineUnionTypes(Type::getFloat(), Type::getInt());
             }
@@ -1953,7 +1966,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
 
             $this->setConstType(
                 $const->name->name,
-                isset($const->value->inferredType) ? $const->value->inferredType : Type::getMixed(),
+                \Psalm\Type\Provider::getNodeType($const->value) ?: Type::getMixed(),
                 $context
             );
         }
@@ -2160,9 +2173,9 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
 
         if ($first_arg_value instanceof PhpParser\Node\Scalar\String_) {
             $const_name = $first_arg_value->value;
-        } elseif (isset($first_arg_value->inferredType)) {
-            if ($first_arg_value->inferredType->isSingleStringLiteral()) {
-                $const_name = $first_arg_value->inferredType->getSingleStringLiteral()->value;
+        } elseif ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg_value)) {
+            if ($first_arg_type->isSingleStringLiteral()) {
+                $const_name = $first_arg_type->getSingleStringLiteral()->value;
             }
         } else {
             $simple_type = self::getSimpleType($codebase, $first_arg_value, $aliases);

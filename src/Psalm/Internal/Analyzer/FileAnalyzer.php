@@ -218,6 +218,8 @@ class FileAnalyzer extends SourceAnalyzer implements StatementsSource
                 }
             }
         }
+
+        \Psalm\Type\Provider::reset();
     }
 
     /**

@@ -27,9 +27,9 @@ class VersionCompareReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRet
         CodeLocation $code_location
     ) : Type\Union {
         if (count($call_args) > 2) {
-            if (isset($call_args[2]->value->inferredType)) {
-                $operator_type = $call_args[2]->value->inferredType;
+            $operator_type = \Psalm\Type\Provider::getNodeType($call_args[2]->value);
 
+            if ($operator_type) {
                 if (!$operator_type->hasMixed()) {
                     $acceptable_operator_type = new Type\Union([
                         new Type\Atomic\TLiteralString('<'),

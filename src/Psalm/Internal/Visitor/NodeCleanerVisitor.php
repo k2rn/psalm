@@ -15,8 +15,9 @@ class NodeCleanerVisitor extends PhpParser\NodeVisitorAbstract implements PhpPar
      */
     public function enterNode(PhpParser\Node $node)
     {
-        /** @psalm-suppress NoInterfaceProperties */
-        unset($node->inferredType, $node->assertions);
+        if ($node instanceof PhpParser\Node\Expr) {
+            \Psalm\Type\Provider::clearNodeOfTypeAndAssertions($node);
+        }
 
         return null;
     }

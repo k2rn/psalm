@@ -94,11 +94,7 @@ class ArrayFetchAnalyzer
         $new_offset_type = null;
 
         if ($stmt->dim) {
-            if (isset($stmt->dim->inferredType)) {
-                $used_key_type = $stmt->dim->inferredType;
-            } else {
-                $used_key_type = Type::getMixed();
-            }
+            $used_key_type = \Psalm\Type\Provider::getNodeType($stmt->dim) ?: Type::getMixed();
 
             $dim_var_id = ExpressionAnalyzer::getArrayVarId(
                 $stmt->dim,
@@ -122,17 +118,15 @@ class ArrayFetchAnalyzer
             && !$context->vars_in_scope[$keyed_array_var_id]->possibly_undefined
             && !$context->vars_in_scope[$keyed_array_var_id]->isVanillaMixed()
         ) {
-            $stmt->inferredType = clone $context->vars_in_scope[$keyed_array_var_id];
+            \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope[$keyed_array_var_id]);
 
             return;
         }
 
         $codebase = $statements_analyzer->getCodebase();
 
-        if (isset($stmt->var->inferredType)) {
-            $var_type = $stmt->var->inferredType;
-
-            if ($var_type->isNull()) {
+        if ($stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var)) {
+            if ($stmt_var_type->isNull()) {
                 if (!$context->inside_isset) {
                     if (IssueBuffer::accepts(
                         new NullArrayAccess(
@@ -145,19 +139,19 @@ class ArrayFetchAnalyzer
                     }
                 }
 
-                if (isset($stmt->inferredType)) {
-                    $stmt->inferredType = Type::combineUnionTypes($stmt->inferredType, Type::getNull());
+                if ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
+                    \Psalm\Type\Provider::setNodeType($stmt, Type::combineUnionTypes($stmt_type, Type::getNull()));
                 } else {
-                    $stmt->inferredType = Type::getNull();
+                    \Psalm\Type\Provider::setNodeType($stmt, Type::getNull());
                 }
 
                 return;
             }
 
-            $stmt->inferredType = self::getArrayAccessTypeGivenOffset(
+            $stmt_type = self::getArrayAccessTypeGivenOffset(
                 $statements_analyzer,
                 $stmt,
-                $stmt->var->inferredType,
+                $stmt_var_type,
                 $used_key_type,
                 false,
                 $array_var_id,
@@ -165,9 +159,11 @@ class ArrayFetchAnalyzer
                 null
             );
 
+            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+
             if ($array_var_id === '$_GET' || $array_var_id === '$_POST' || $array_var_id === '$_COOKIE') {
-                $stmt->inferredType->tainted = (int) Type\Union::TAINTED_INPUT;
-                $stmt->inferredType->sources = [
+                $stmt_type->tainted = (int) Type\Union::TAINTED_INPUT;
+                $stmt_type->sources = [
                     new Source(
                         $array_var_id,
                         $array_var_id,
@@ -179,8 +175,8 @@ class ArrayFetchAnalyzer
 
             if ($context->inside_isset
                 && $stmt->dim
-                && isset($stmt->dim->inferredType)
-                && $stmt->var->inferredType->hasArray()
+                && ($stmt_dim_type = \Psalm\Type\Provider::getNodeType($stmt->dim))
+                && $stmt_var_type->hasArray()
                 && ($stmt->var instanceof PhpParser\Node\Expr\ClassConstFetch
                     || $stmt->var instanceof PhpParser\Node\Expr\ConstFetch)
             ) {
@@ -188,7 +184,7 @@ class ArrayFetchAnalyzer
                  * @psalm-suppress PossiblyUndefinedStringArrayOffset
                  * @var TArray|ObjectLike|TList
                  */
-                $array_type = $stmt->var->inferredType->getTypes()['array'];
+                $array_type = $stmt_var_type->getTypes()['array'];
 
                 if ($array_type instanceof TArray) {
                     $const_array_key_type = $array_type->type_params[0];
@@ -200,9 +196,9 @@ class ArrayFetchAnalyzer
 
                 if ($dim_var_id
                     && !$const_array_key_type->hasMixed()
-                    && !$stmt->dim->inferredType->hasMixed()
+                    && !$stmt_dim_type->hasMixed()
                 ) {
-                    $new_offset_type = clone $stmt->dim->inferredType;
+                    $new_offset_type = clone $stmt_dim_type;
                     $const_array_key_atomic_types = $const_array_key_type->getTypes();
 
                     foreach ($new_offset_type->getTypes() as $offset_key => $offset_atomic_type) {
@@ -232,15 +228,16 @@ class ArrayFetchAnalyzer
 
         if ($keyed_array_var_id
             && $context->hasVariable($keyed_array_var_id, $statements_analyzer)
-            && (!isset($stmt->inferredType) || $stmt->inferredType->isVanillaMixed())
+            && (!($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) || $stmt_type->isVanillaMixed())
         ) {
-            $stmt->inferredType = $context->vars_in_scope[$keyed_array_var_id];
+            \Psalm\Type\Provider::setNodeType($stmt, $context->vars_in_scope[$keyed_array_var_id]);
         }
 
-        if (!isset($stmt->inferredType)) {
-            $stmt->inferredType = Type::getMixed();
+        if (!($stmt_type = \Psalm\Type\Provider::getNodeType($stmt))) {
+            $stmt_type = Type::getMixed();
+            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
         } else {
-            if ($stmt->inferredType->possibly_undefined && !$context->inside_isset && !$context->inside_unset) {
+            if ($stmt_type->possibly_undefined && !$context->inside_isset && !$context->inside_unset) {
                 if (IssueBuffer::accepts(
                     new PossiblyUndefinedArrayOffset(
                         'Possibly undefined array key ' . $keyed_array_var_id,
@@ -252,7 +249,7 @@ class ArrayFetchAnalyzer
                 }
             }
 
-            $stmt->inferredType->possibly_undefined = false;
+            $stmt_type->possibly_undefined = false;
         }
 
         if ($context->inside_isset && $dim_var_id && $new_offset_type && $new_offset_type->getTypes()) {
@@ -260,28 +257,26 @@ class ArrayFetchAnalyzer
         }
 
         if ($keyed_array_var_id && !$context->inside_isset) {
-            $context->vars_in_scope[$keyed_array_var_id] = $stmt->inferredType;
+            $context->vars_in_scope[$keyed_array_var_id] = $stmt_type;
             $context->vars_possibly_in_scope[$keyed_array_var_id] = true;
 
             // reference the variable too
             $context->hasVariable($keyed_array_var_id, $statements_analyzer);
         }
 
-        if ($codebase->taint && isset($stmt->var->inferredType)) {
+        if ($codebase->taint && ($stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var))) {
             $sources = [];
             $either_tainted = 0;
 
-            if (isset($stmt->var->inferredType)) {
-                $sources = \array_merge($sources, $stmt->var->inferredType->sources ?: []);
-                $either_tainted = $either_tainted | $stmt->var->inferredType->tainted;
-            }
+            $sources = \array_merge($sources, $stmt_var_type->sources ?: []);
+            $either_tainted = $either_tainted | $stmt_var_type->tainted;
 
             if ($sources) {
-                $stmt->inferredType->sources = $sources;
+                $stmt_type->sources = $sources;
             }
 
             if ($either_tainted) {
-                $stmt->inferredType->tainted = $either_tainted;
+                $stmt_type->tainted = $either_tainted;
             }
         }
 
@@ -321,8 +316,8 @@ class ArrayFetchAnalyzer
             || $stmt->dim instanceof PhpParser\Node\Scalar\LNumber
         ) {
             $key_value = $stmt->dim->value;
-        } elseif (isset($stmt->dim->inferredType)) {
-            foreach ($stmt->dim->inferredType->getTypes() as $possible_value_type) {
+        } elseif ($stmt->dim && ($stmt_dim_type = \Psalm\Type\Provider::getNodeType($stmt->dim))) {
+            foreach ($stmt_dim_type->getTypes() as $possible_value_type) {
                 if ($possible_value_type instanceof TLiteralString
                     || $possible_value_type instanceof TLiteralInt
                 ) {
@@ -1019,8 +1014,7 @@ class ArrayFetchAnalyzer
                         $statements_analyzer->removeSuppressedIssues(['PossiblyInvalidMethodCall']);
                     }
 
-                    $iterator_class_type = $fake_method_call->inferredType ?? null;
-                    $array_access_type = $iterator_class_type ?: Type::getMixed();
+                    $array_access_type = \Psalm\Type\Provider::getNodeType($fake_method_call) ?: Type::getMixed();
                 } else {
                     $suppressed_issues = $statements_analyzer->getSuppressedIssues();
 
@@ -1075,14 +1069,13 @@ class ArrayFetchAnalyzer
                             $context
                         );
 
-                        $iterator_class_type = $fake_get_method_call->inferredType ?? null;
+                        $array_access_type = \Psalm\Type\Provider::getNodeType($fake_get_method_call)
+                            ?: Type::getMixed();
                     } else {
-                        $iterator_class_type = Type::getVoid();
+                        $array_access_type = Type::getVoid();
                     }
 
                     $has_array_access = true;
-
-                    $array_access_type = $iterator_class_type ?: Type::getMixed();
 
                     if (!in_array('PossiblyInvalidMethodCall', $suppressed_issues, true)) {
                         $statements_analyzer->removeSuppressedIssues(['PossiblyInvalidMethodCall']);

@@ -43,14 +43,14 @@ class ReturnTypeCollector
 
                 if (!$stmt->expr) {
                     $return_types[] = new Atomic\TVoid();
-                } elseif (isset($stmt->inferredType)) {
-                    $return_types = array_merge(array_values($stmt->inferredType->getTypes()), $return_types);
+                } elseif ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
+                    $return_types = array_merge(array_values($stmt_type->getTypes()), $return_types);
 
-                    if ($stmt->inferredType->ignore_nullable_issues) {
+                    if ($stmt_type->ignore_nullable_issues) {
                         $ignore_nullable_issues = true;
                     }
 
-                    if ($stmt->inferredType->ignore_falsable_issues) {
+                    if ($stmt_type->ignore_falsable_issues) {
                         $ignore_falsable_issues = true;
                     }
                 } else {
@@ -314,16 +314,16 @@ class ReturnTypeCollector
         if ($stmt instanceof PhpParser\Node\Expr\Yield_) {
             $key_type = null;
 
-            if (isset($stmt->key->inferredType)) {
-                $key_type = $stmt->key->inferredType;
+            if ($stmt->key && ($stmt_key_type = \Psalm\Type\Provider::getNodeType($stmt->key))) {
+                $key_type = $stmt_key_type;
             }
 
-            if (isset($stmt->inferredType)) {
+            if ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
                 $generator_type = new Atomic\TGenericObject(
                     'Generator',
                     [
                         $key_type ?: Type::getInt(),
-                        $stmt->inferredType,
+                        $stmt_type,
                     ]
                 );
 
@@ -332,8 +332,8 @@ class ReturnTypeCollector
 
             return [new Atomic\TMixed()];
         } elseif ($stmt instanceof PhpParser\Node\Expr\YieldFrom) {
-            if (isset($stmt->expr->inferredType)) {
-                return array_values($stmt->expr->inferredType->getTypes());
+            if ($stmt_expr_type = \Psalm\Type\Provider::getNodeType($stmt->expr)) {
+                return array_values($stmt_expr_type->getTypes());
             }
 
             return [new Atomic\TMixed()];

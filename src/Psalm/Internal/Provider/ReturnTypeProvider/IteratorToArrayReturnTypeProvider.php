@@ -30,15 +30,15 @@ class IteratorToArrayReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRe
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
-        if (isset($call_args[0]->value->inferredType)
-            && $call_args[0]->value->inferredType->hasObjectType()
+        if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+            && $first_arg_type->hasObjectType()
         ) {
             $key_type = null;
             $value_type = null;
 
             $codebase = $statements_source->getCodebase();
 
-            foreach ($call_args[0]->value->inferredType->getTypes() as $call_arg_atomic_type) {
+            foreach ($first_arg_type->getTypes() as $call_arg_atomic_type) {
                 if ($call_arg_atomic_type instanceof Type\Atomic\TNamedObject
                     && TypeAnalyzer::isAtomicContainedBy(
                         $codebase,
@@ -63,8 +63,12 @@ class IteratorToArrayReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRe
             }
 
             if ($value_type) {
-                if (isset($call_args[1]->value->inferredType)
-                    && ((string) $call_args[1]->value->inferredType === 'false')
+                $second_arg_type = isset($call_args[1])
+                    ? \Psalm\Type\Provider::getNodeType($call_args[1]->value)
+                    : null;
+
+                if ($second_arg_type
+                    && ((string) $second_arg_type === 'false')
                 ) {
                     return new Type\Union([
                         new Type\Atomic\TList($value_type),
@@ -74,9 +78,8 @@ class IteratorToArrayReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRe
                 return new Type\Union([
                     new Type\Atomic\TArray([
                         $key_type
-                            && (!isset($call_args[1]->value)
-                                || (isset($call_args[1]->value->inferredType)
-                                    && ((string) $call_args[1]->value->inferredType === 'true')))
+                            && (!isset($call_args[1])
+                                || ($second_arg_type && ((string) $second_arg_type === 'true')))
                             ? $key_type
                             : Type::getArrayKey(),
                         $value_type,

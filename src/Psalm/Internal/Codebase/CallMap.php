@@ -121,11 +121,9 @@ class CallMap
                     continue;
                 }
 
-                if (!isset($arg->value->inferredType)) {
+                if (!($arg_type = \Psalm\Type\Provider::getNodeType($arg->value))) {
                     continue;
                 }
-
-                $arg_type = $arg->value->inferredType;
 
                 if ($arg_type->hasMixed()) {
                     continue;

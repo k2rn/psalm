@@ -108,8 +108,8 @@ class ScopeAnalyzer
                 }
 
                 // This allows calls to functions that always exit to act as exit statements themselves
-                if (isset($stmt->expr->inferredType)
-                    && $stmt->expr->inferredType->isNever()
+                if (($stmt_expr_type = \Psalm\Type\Provider::getNodeType($stmt->expr))
+                    && $stmt_expr_type->isNever()
                 ) {
                     return [self::ACTION_END];
                 }

@@ -113,7 +113,8 @@ class PhpStormMetaScanner
                             return null;
                         }
 
-                        if (($call_arg_type = $call_args[$offset]->value->inferredType ?? null)
+                        if (isset($call_args[$offset]->value)
+                            && ($call_arg_type = \Psalm\Type\Provider::getNodeType($call_args[$offset]->value))
                             && $call_arg_type->isSingleStringLiteral()
                         ) {
                             $offset_arg_value = $call_arg_type->getSingleStringLiteral()->value;
@@ -166,7 +167,9 @@ class PhpStormMetaScanner
                             return null;
                         }
 
-                        if (($call_arg_type = $call_args[$type_offset]->value->inferredType ?? null)) {
+                        if (isset($call_args[$type_offset]->value)
+                            && ($call_arg_type = \Psalm\Type\Provider::getNodeType($call_args[$type_offset]->value))
+                        ) {
                             return clone $call_arg_type;
                         }
 
@@ -199,24 +202,26 @@ class PhpStormMetaScanner
                             return null;
                         }
 
-                        if (($call_arg_type = $call_args[$element_type_offset]->value->inferredType ?? null)) {
-                            if ($call_arg_type->hasArray()) {
-                                /**
-                                 * @psalm-suppress PossiblyUndefinedStringArrayOffset
-                                 * @var Type\Atomic\TArray|Type\Atomic\ObjectLike|Type\Atomic\TList
-                                 */
-                                $array_atomic_type = $call_arg_type->getTypes()['array'];
+                        if (isset($call_args[$element_type_offset]->value)
+                            && ($call_arg_type
+                                = \Psalm\Type\Provider::getNodeType($call_args[$element_type_offset]->value))
+                            && $call_arg_type->hasArray()
+                        ) {
+                            /**
+                             * @psalm-suppress PossiblyUndefinedStringArrayOffset
+                             * @var Type\Atomic\TArray|Type\Atomic\ObjectLike|Type\Atomic\TList
+                             */
+                            $array_atomic_type = $call_arg_type->getTypes()['array'];
 
-                                if ($array_atomic_type instanceof Type\Atomic\ObjectLike) {
-                                    return $array_atomic_type->getGenericValueType();
-                                }
-
-                                if ($array_atomic_type instanceof Type\Atomic\TList) {
-                                    return $array_atomic_type->type_param;
-                                }
-
-                                return clone $array_atomic_type->type_params[1];
+                            if ($array_atomic_type instanceof Type\Atomic\ObjectLike) {
+                                return $array_atomic_type->getGenericValueType();
                             }
+
+                            if ($array_atomic_type instanceof Type\Atomic\TList) {
+                                return $array_atomic_type->type_param;
+                            }
+
+                            return clone $array_atomic_type->type_params[1];
                         }
 
                         return null;
@@ -250,7 +255,8 @@ class PhpStormMetaScanner
                         $map,
                         $offset
                     ) : Type\Union {
-                        if (($call_arg_type = $call_args[$offset]->value->inferredType ?? null)
+                        if (isset($call_args[$offset]->value)
+                            && ($call_arg_type = \Psalm\Type\Provider::getNodeType($call_args[$offset]->value))
                             && $call_arg_type->isSingleStringLiteral()
                         ) {
                             $offset_arg_value = $call_arg_type->getSingleStringLiteral()->value;
@@ -302,7 +308,9 @@ class PhpStormMetaScanner
                         $map,
                         $type_offset
                     ) : Type\Union {
-                        if (($call_arg_type = $call_args[$type_offset]->value->inferredType ?? null)) {
+                        if (isset($call_args[$type_offset]->value)
+                            && ($call_arg_type = \Psalm\Type\Provider::getNodeType($call_args[$type_offset]->value))
+                        ) {
                             return clone $call_arg_type;
                         }
 
@@ -334,24 +342,26 @@ class PhpStormMetaScanner
                         $map,
                         $element_type_offset
                     ) : Type\Union {
-                        if (($call_arg_type = $call_args[$element_type_offset]->value->inferredType ?? null)) {
-                            if ($call_arg_type->hasArray()) {
-                                /**
-                                 * @psalm-suppress PossiblyUndefinedStringArrayOffset
-                                 * @var Type\Atomic\TArray|Type\Atomic\ObjectLike|Type\Atomic\TList
-                                 */
-                                $array_atomic_type = $call_arg_type->getTypes()['array'];
+                        if (isset($call_args[$element_type_offset]->value)
+                            && ($call_arg_type
+                                = \Psalm\Type\Provider::getNodeType($call_args[$element_type_offset]->value))
+                            && $call_arg_type->hasArray()
+                        ) {
+                            /**
+                             * @psalm-suppress PossiblyUndefinedStringArrayOffset
+                             * @var Type\Atomic\TArray|Type\Atomic\ObjectLike|Type\Atomic\TList
+                             */
+                            $array_atomic_type = $call_arg_type->getTypes()['array'];
 
-                                if ($array_atomic_type instanceof Type\Atomic\ObjectLike) {
-                                    return $array_atomic_type->getGenericValueType();
-                                }
-
-                                if ($array_atomic_type instanceof Type\Atomic\TList) {
-                                    return $array_atomic_type->type_param;
-                                }
-
-                                return clone $array_atomic_type->type_params[1];
+                            if ($array_atomic_type instanceof Type\Atomic\ObjectLike) {
+                                return $array_atomic_type->getGenericValueType();
                             }
+
+                            if ($array_atomic_type instanceof Type\Atomic\TList) {
+                                return $array_atomic_type->type_param;
+                            }
+
+                            return clone $array_atomic_type->type_params[1];
                         }
 
                         if (!$statements_analyzer instanceof StatementsAnalyzer) {

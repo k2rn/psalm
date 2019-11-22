@@ -28,9 +28,9 @@ class ArraySliceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnT
         $first_arg = isset($call_args[0]->value) ? $call_args[0]->value : null;
 
         $first_arg_array = $first_arg
-            && isset($first_arg->inferredType)
-            && $first_arg->inferredType->hasType('array')
-            && ($array_atomic_type = $first_arg->inferredType->getTypes()['array'])
+            && ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg))
+            && $first_arg_type->hasType('array')
+            && ($array_atomic_type = $first_arg_type->getTypes()['array'])
             && ($array_atomic_type instanceof Type\Atomic\TArray
                 || $array_atomic_type instanceof Type\Atomic\ObjectLike
                 || $array_atomic_type instanceof Type\Atomic\TList)
@@ -42,8 +42,8 @@ class ArraySliceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnT
         }
 
         $dont_preserve_int_keys = !isset($call_args[3]->value)
-            || (isset($call_args[3]->value->inferredType)
-                && ((string) $call_args[3]->value->inferredType === 'false'));
+            || (($third_arg_type = \Psalm\Type\Provider::getNodeType($call_args[3]->value))
+                && ((string) $third_arg_type === 'false'));
 
         $already_cloned = false;
 

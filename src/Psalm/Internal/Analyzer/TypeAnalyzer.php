@@ -1637,7 +1637,9 @@ class TypeAnalyzer
                                 new \PhpParser\Node\Expr\Variable('_' . $i)
                             );
 
-                            $arg->value->inferredType = $param->type;
+                            if ($param->type) {
+                                \Psalm\Type\Provider::setNodeType($arg->value, $param->type);
+                            }
 
                             $args[] = $arg;
                         }

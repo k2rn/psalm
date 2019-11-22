@@ -26,8 +26,8 @@ class GetObjectVarsReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRetu
         Context $context,
         CodeLocation $code_location
     ) {
-        if (isset($call_args[0]->value->inferredType)
-             && $call_args[0]->value->inferredType->isObjectType()
+        if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+             && $first_arg_type->isObjectType()
         ) {
             return Type::parseString('array<string, mixed>');
         }

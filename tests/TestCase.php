@@ -51,6 +51,7 @@ class TestCase extends BaseTestCase
         parent::setUp();
 
         FileAnalyzer::clearCache();
+        \Psalm\Type\Provider::reset();
 
         $this->file_provider = new \Psalm\Tests\Internal\Provider\FakeFileProvider();
 
@@ -72,6 +73,7 @@ class TestCase extends BaseTestCase
     public function tearDown() : void
     {
         FileAnalyzer::clearCache();
+        \Psalm\Type\Provider::reset();
     }
 
     /**

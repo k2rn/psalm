@@ -26,8 +26,8 @@ class GetClassMethodsReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRe
         Context $context,
         CodeLocation $code_location
     ) {
-        if (isset($call_args[0]->value->inferredType)
-             && ($call_args[0]->value->inferredType->hasObjectType() || $call_args[0]->value->inferredType->hasString())
+        if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+             && ($first_arg_type->hasObjectType() || $first_arg_type->hasString())
         ) {
             return Type::parseString('array<string>');
         }

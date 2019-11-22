@@ -29,8 +29,8 @@ class FirstArgStringReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRet
     ) {
         $return_type = Type::getString();
 
-        if (isset($call_args[0]->value->inferredType)
-             && $call_args[0]->value->inferredType->isString()
+        if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+             && $first_arg_type->isString()
         ) {
             return $return_type;
         }

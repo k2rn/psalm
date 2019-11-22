@@ -579,10 +579,11 @@ class Methods
             && CallMap::inCallMap($appearing_method_id)
         ) {
             if ($appearing_method_id === 'Closure::fromcallable'
-                && isset($args[0]->value->inferredType)
-                && $args[0]->value->inferredType->isSingle()
+                && isset($args[0])
+                && ($first_arg_type = \Psalm\Type\Provider::getNodeType($args[0]->value))
+                && $first_arg_type->isSingle()
             ) {
-                foreach ($args[0]->value->inferredType->getTypes() as $atomic_type) {
+                foreach ($first_arg_type->getTypes() as $atomic_type) {
                     if ($atomic_type instanceof Type\Atomic\TCallable
                         || $atomic_type instanceof Type\Atomic\TFn
                     ) {
