@@ -24,10 +24,14 @@ class ArrayReverseReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRetur
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         $first_arg = $call_args[0]->value ?? null;
 
         $first_arg_array = $first_arg
-            && ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg))
+            && ($first_arg_type = $statements_source->nodes->getNodeType($first_arg))
             && $first_arg_type->hasType('array')
             && ($array_atomic_type = $first_arg_type->getTypes()['array'])
             && ($array_atomic_type instanceof Type\Atomic\TArray
@@ -48,7 +52,7 @@ class ArrayReverseReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRetur
             $second_arg = $call_args[1]->value ?? null;
 
             if (!$second_arg
-                || (($second_arg_type = \Psalm\Type\Provider::getNodeType($second_arg))
+                || (($second_arg_type = $statements_source->nodes->getNodeType($second_arg))
                     && $second_arg_type->isFalse()
                 )
             ) {

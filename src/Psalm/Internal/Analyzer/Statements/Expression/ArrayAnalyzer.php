@@ -36,7 +36,7 @@ class ArrayAnalyzer
     ) {
         // if the array is empty, this special type allows us to match any other array type against it
         if (empty($stmt->items)) {
-            \Psalm\Type\Provider::setNodeType($stmt, Type::getEmptyArray());
+            $statements_analyzer->nodes->setNodeType($stmt, Type::getEmptyArray());
 
             return null;
         }
@@ -74,7 +74,7 @@ class ArrayAnalyzer
                     return false;
                 }
 
-                if ($item_key_type = \Psalm\Type\Provider::getNodeType($item->key)) {
+                if ($item_key_type = $statements_analyzer->nodes->getNodeType($item->key)) {
                     $key_type = $item_key_type;
 
                     if ($key_type->isNull()) {
@@ -130,12 +130,12 @@ class ArrayAnalyzer
             }
 
             if ($codebase->taint) {
-                if ($item_value_type = \Psalm\Type\Provider::getNodeType($item->value)) {
+                if ($item_value_type = $statements_analyzer->nodes->getNodeType($item->value)) {
                     $taint_sources = array_merge($taint_sources, $item_value_type->sources ?: []);
                     $either_tainted = $either_tainted | $item_value_type->tainted;
                 }
 
-                if ($item->key && ($item_key_type = \Psalm\Type\Provider::getNodeType($item->key))) {
+                if ($item->key && ($item_key_type = $statements_analyzer->nodes->getNodeType($item->key))) {
                     $taint_sources = array_merge($taint_sources, $item_key_type->sources ?: []);
                     $either_tainted = $either_tainted | $item_key_type->tainted;
                 }
@@ -164,7 +164,7 @@ class ArrayAnalyzer
                 continue;
             }
 
-            if ($item_value_type = \Psalm\Type\Provider::getNodeType($item->value)) {
+            if ($item_value_type = $statements_analyzer->nodes->getNodeType($item->value)) {
                 if ($item_key_value !== null && count($property_types) <= 100) {
                     $property_types[$item_key_value] = $item_value_type;
                 } else {
@@ -230,7 +230,7 @@ class ArrayAnalyzer
                 $stmt_type->tainted = $either_tainted;
             }
 
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
             return null;
         }
@@ -251,7 +251,7 @@ class ArrayAnalyzer
                 $stmt_type->tainted = $either_tainted;
             }
 
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
             return null;
         }
@@ -275,7 +275,7 @@ class ArrayAnalyzer
             $stmt_type->tainted = $either_tainted;
         }
 
-        \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+        $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
         return null;
     }

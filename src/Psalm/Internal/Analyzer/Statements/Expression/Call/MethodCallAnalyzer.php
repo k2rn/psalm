@@ -117,10 +117,10 @@ class MethodCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
             ? $context->vars_in_scope[$lhs_var_id]
             : null;
 
-        if ($stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var)) {
+        if ($stmt_var_type = $statements_analyzer->nodes->getNodeType($stmt->var)) {
             $class_type = $stmt_var_type;
         } elseif (!$class_type) {
-            \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+            $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
         }
 
         if (!$context->check_classes) {
@@ -333,13 +333,13 @@ class MethodCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
         $stmt_type = $return_type;
 
         if ($stmt_type) {
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
         }
 
         if ($returns_by_ref) {
             if (!$stmt_type) {
                 $stmt_type = Type::getMixed();
-                \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
             }
 
             $stmt_type->by_ref = $returns_by_ref;
@@ -1192,10 +1192,11 @@ class MethodCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                     $return_type_candidate = $codebase->methods->getMethodReturnType(
                         $method_id,
                         $self_fq_class_name,
+                        $statements_analyzer,
                         $args
                     );
 
-                    if ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
+                    if ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt)) {
                         $return_type_candidate = $stmt_type;
                     }
 
@@ -1272,7 +1273,7 @@ class MethodCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                     if ($method_storage) {
                         if (!$context->collect_mutations && !$context->collect_initializations) {
                             $method_pure_compatible = $method_storage->external_mutation_free
-                                && \Psalm\Type\Provider::isPureCompatible($stmt->var);
+                                && $statements_analyzer->nodes->isPureCompatible($stmt->var);
 
                             if ($context->pure
                                 && !$method_storage->mutation_free
@@ -1378,7 +1379,7 @@ class MethodCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                         }
 
                         if ($method_storage->if_true_assertions) {
-                            \Psalm\Type\Provider::setNodeIfTrueAssertions(
+                            $statements_analyzer->nodes->setNodeIfTrueAssertions(
                                 $stmt,
                                 array_map(
                                     function (Assertion $assertion) use ($class_template_params) : Assertion {
@@ -1390,7 +1391,7 @@ class MethodCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                         }
 
                         if ($method_storage->if_false_assertions) {
-                            \Psalm\Type\Provider::setNodeIfFalseAssertions(
+                            $statements_analyzer->nodes->setNodeIfFalseAssertions(
                                 $stmt,
                                 array_map(
                                     function (Assertion $assertion) use ($class_template_params) : Assertion {
@@ -1779,7 +1780,7 @@ class MethodCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
 
                 // If a `@property` annotation is set, the type of the value passed to the
                 // magic setter must match the annotation.
-                $second_arg_type = \Psalm\Type\Provider::getNodeType($stmt->args[1]->value);
+                $second_arg_type = $statements_analyzer->nodes->getNodeType($stmt->args[1]->value);
 
                 if (isset($class_storage->pseudo_property_set_types['$' . $prop_name]) && $second_arg_type) {
                     $pseudo_set_type = ExpressionAnalyzer::fleshOutType(
@@ -1883,7 +1884,7 @@ class MethodCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                 }
 
                 if (isset($class_storage->pseudo_property_get_types['$' . $prop_name])) {
-                    \Psalm\Type\Provider::setNodeType(
+                    $statements_analyzer->nodes->setNodeType(
                         $stmt,
                         clone $class_storage->pseudo_property_get_types['$' . $prop_name]
                     );

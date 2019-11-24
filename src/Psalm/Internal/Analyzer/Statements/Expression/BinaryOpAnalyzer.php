@@ -337,7 +337,7 @@ class BinaryOpAnalyzer
         } elseif ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Concat) {
             $stmt_type = Type::getString();
 
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
             if (ExpressionAnalyzer::analyze($statements_analyzer, $stmt->left, $context) === false) {
                 return false;
@@ -351,12 +351,12 @@ class BinaryOpAnalyzer
                 $sources = [];
                 $either_tainted = 0;
 
-                if ($stmt_left_type = \Psalm\Type\Provider::getNodeType($stmt->left)) {
+                if ($stmt_left_type = $statements_analyzer->nodes->getNodeType($stmt->left)) {
                     $sources = $stmt_left_type->sources ?: [];
                     $either_tainted = $stmt_left_type->tainted;
                 }
 
-                if ($stmt_right_type = \Psalm\Type\Provider::getNodeType($stmt->right)) {
+                if ($stmt_right_type = $statements_analyzer->nodes->getNodeType($stmt->right)) {
                     $sources = array_merge($sources, $stmt_right_type->sources ?: []);
                     $either_tainted = $either_tainted | $stmt_right_type->tainted;
                 }
@@ -452,7 +452,7 @@ class BinaryOpAnalyzer
                 IssueBuffer::clearRecordingLevel();
                 IssueBuffer::stopRecording();
 
-                $naive_type = \Psalm\Type\Provider::getNodeType($stmt->left);
+                $naive_type = $statements_analyzer->nodes->getNodeType($stmt->left);
 
                 if ($naive_type
                     && !$naive_type->hasMixed()
@@ -549,7 +549,7 @@ class BinaryOpAnalyzer
 
             $lhs_type = null;
 
-            if ($stmt_left_type = \Psalm\Type\Provider::getNodeType($stmt->left)) {
+            if ($stmt_left_type = $statements_analyzer->nodes->getNodeType($stmt->left)) {
                 $if_return_type_reconciled = AssertionReconciler::reconcile(
                     '!null',
                     $stmt_left_type,
@@ -566,14 +566,14 @@ class BinaryOpAnalyzer
 
             $stmt_right_type = null;
 
-            if (!$lhs_type || !($stmt_right_type = \Psalm\Type\Provider::getNodeType($stmt->right))) {
+            if (!$lhs_type || !($stmt_right_type = $statements_analyzer->nodes->getNodeType($stmt->right))) {
                 $stmt_type = Type::getMixed();
 
-                \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
             } else {
                 $stmt_type = Type::combineUnionTypes($lhs_type, $stmt_right_type);
 
-                \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
             }
         } else {
             if ($stmt->left instanceof PhpParser\Node\Expr\BinaryOp) {
@@ -597,8 +597,8 @@ class BinaryOpAnalyzer
             }
         }
 
-        $stmt_left_type = \Psalm\Type\Provider::getNodeType($stmt->left);
-        $stmt_right_type = \Psalm\Type\Provider::getNodeType($stmt->right);
+        $stmt_left_type = $statements_analyzer->nodes->getNodeType($stmt->left);
+        $stmt_right_type = $statements_analyzer->nodes->getNodeType($stmt->right);
 
         // let's do some fun type assignment
         if ($stmt_left_type && $stmt_right_type) {
@@ -611,7 +611,7 @@ class BinaryOpAnalyzer
             ) {
                 $stmt_type = Type::getString();
 
-                \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
             } elseif ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Plus
                 || $stmt instanceof PhpParser\Node\Expr\BinaryOp\Minus
                 || $stmt instanceof PhpParser\Node\Expr\BinaryOp\Mod
@@ -628,6 +628,7 @@ class BinaryOpAnalyzer
             ) {
                 self::analyzeNonDivArithmeticOp(
                     $statements_analyzer,
+                    $statements_analyzer->nodes,
                     $stmt->left,
                     $stmt->right,
                     $stmt,
@@ -636,19 +637,20 @@ class BinaryOpAnalyzer
                 );
 
                 if ($result_type) {
-                    \Psalm\Type\Provider::setNodeType($stmt, $result_type);
+                    $statements_analyzer->nodes->setNodeType($stmt, $result_type);
                 }
             } elseif ($stmt instanceof PhpParser\Node\Expr\BinaryOp\BitwiseXor
                 && ($stmt_left_type->hasBool() || $stmt_right_type->hasBool())
             ) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getInt());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getInt());
             } elseif ($stmt instanceof PhpParser\Node\Expr\BinaryOp\LogicalXor
                 && ($stmt_left_type->hasBool() || $stmt_right_type->hasBool())
             ) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getBool());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getBool());
             } elseif ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Div) {
                 self::analyzeNonDivArithmeticOp(
                     $statements_analyzer,
+                    $statements_analyzer->nodes,
                     $stmt->left,
                     $stmt->right,
                     $stmt,
@@ -661,7 +663,7 @@ class BinaryOpAnalyzer
                         $result_type->addType(new TFloat);
                     }
 
-                    \Psalm\Type\Provider::setNodeType($stmt, $result_type);
+                    $statements_analyzer->nodes->setNodeType($stmt, $result_type);
                 }
             } elseif ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Concat) {
                 self::analyzeConcatOp(
@@ -675,7 +677,7 @@ class BinaryOpAnalyzer
                 if ($result_type) {
                     $stmt_type = $result_type;
 
-                    \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                    $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
                 }
 
                 if ($codebase->taint && $stmt_type) {
@@ -696,6 +698,7 @@ class BinaryOpAnalyzer
             } elseif ($stmt instanceof PhpParser\Node\Expr\BinaryOp\BitwiseOr) {
                 self::analyzeNonDivArithmeticOp(
                     $statements_analyzer,
+                    $statements_analyzer->nodes,
                     $stmt->left,
                     $stmt->right,
                     $stmt,
@@ -718,11 +721,11 @@ class BinaryOpAnalyzer
             || $stmt instanceof PhpParser\Node\Expr\BinaryOp\Smaller
             || $stmt instanceof PhpParser\Node\Expr\BinaryOp\SmallerOrEqual
         ) {
-            \Psalm\Type\Provider::setNodeType($stmt, Type::getBool());
+            $statements_analyzer->nodes->setNodeType($stmt, Type::getBool());
         }
 
         if ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Spaceship) {
-            \Psalm\Type\Provider::setNodeType($stmt, Type::getInt());
+            $statements_analyzer->nodes->setNodeType($stmt, Type::getInt());
         }
 
         return null;
@@ -745,6 +748,7 @@ class BinaryOpAnalyzer
 
     public static function analyzeNonDivArithmeticOp(
         ?StatementsSource $statements_source,
+        \Psalm\Type\Provider $nodes,
         PhpParser\Node\Expr $left,
         PhpParser\Node\Expr $right,
         PhpParser\Node $parent,
@@ -753,8 +757,8 @@ class BinaryOpAnalyzer
     ) : void {
         $codebase = $statements_source ? $statements_source->getCodebase() : null;
 
-        $left_type = \Psalm\Type\Provider::getNodeType($left);
-        $right_type = \Psalm\Type\Provider::getNodeType($right);
+        $left_type = $nodes->getNodeType($left);
+        $right_type = $nodes->getNodeType($right);
         $config = Config::getInstance();
 
         if ($left_type && $right_type) {
@@ -1351,8 +1355,8 @@ class BinaryOpAnalyzer
     ) {
         $codebase = $statements_analyzer->getCodebase();
 
-        $left_type = \Psalm\Type\Provider::getNodeType($left);
-        $right_type = \Psalm\Type\Provider::getNodeType($right);
+        $left_type = $statements_analyzer->nodes->getNodeType($left);
+        $right_type = $statements_analyzer->nodes->getNodeType($right);
         $config = Config::getInstance();
 
         if ($left_type && $right_type) {

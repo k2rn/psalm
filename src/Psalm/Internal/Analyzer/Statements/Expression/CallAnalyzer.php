@@ -562,7 +562,7 @@ class CallAnalyzer
                         $generic_param_type,
                         $replace_template_result,
                         $codebase,
-                        \Psalm\Type\Provider::getNodeType($arg->value),
+                        $statements_analyzer->nodes->getNodeType($arg->value),
                         null
                     );
 
@@ -760,7 +760,7 @@ class CallAnalyzer
                 return;
             }
 
-            if (($arg_value_type = \Psalm\Type\Provider::getNodeType($arg->value))
+            if (($arg_value_type = $statements_analyzer->nodes->getNodeType($arg->value))
                 && $arg_value_type->hasArray()
             ) {
                 /**
@@ -842,7 +842,7 @@ class CallAnalyzer
             }
         }
 
-        if (($array_arg_type = \Psalm\Type\Provider::getNodeType($array_arg))
+        if (($array_arg_type = $statements_analyzer->nodes->getNodeType($array_arg))
             && $array_arg_type->hasArray()
         ) {
             /**
@@ -870,7 +870,7 @@ class CallAnalyzer
                     return false;
                 }
 
-                if (!($arg_value_type = \Psalm\Type\Provider::getNodeType($arg->value))
+                if (!($arg_value_type = $statements_analyzer->nodes->getNodeType($arg->value))
                     || $arg_value_type->hasMixed()
                 ) {
                     $by_ref_type = Type::combineUnionTypes(
@@ -977,7 +977,7 @@ class CallAnalyzer
 
         $context->inside_call = false;
 
-        $replacement_arg_type = \Psalm\Type\Provider::getNodeType($replacement_arg);
+        $replacement_arg_type = $statements_analyzer->nodes->getNodeType($replacement_arg);
 
         if ($replacement_arg_type
             && !$replacement_arg_type->hasArray()
@@ -988,10 +988,10 @@ class CallAnalyzer
                 new Type\Atomic\TArray([Type::getInt(), $replacement_arg_type])
             ]);
 
-            \Psalm\Type\Provider::setNodeType($replacement_arg, $replacement_arg_type);
+            $statements_analyzer->nodes->setNodeType($replacement_arg, $replacement_arg_type);
         }
 
-        if (($array_arg_type = \Psalm\Type\Provider::getNodeType($array_arg))
+        if (($array_arg_type = $statements_analyzer->nodes->getNodeType($array_arg))
             && $array_arg_type->hasArray()
             && $replacement_arg_type
             && $replacement_arg_type->hasArray()
@@ -1234,7 +1234,7 @@ class CallAnalyzer
                         continue;
                     }
 
-                    $arg_value_type = \Psalm\Type\Provider::getNodeType($arg->value);
+                    $arg_value_type = $statements_analyzer->nodes->getNodeType($arg->value);
 
                     if (!$arg_value_type) {
                         continue;
@@ -1291,7 +1291,7 @@ class CallAnalyzer
             }
 
             if ($method_id === 'compact'
-                && ($arg_value_type = \Psalm\Type\Provider::getNodeType($arg->value))
+                && ($arg_value_type = $statements_analyzer->nodes->getNodeType($arg->value))
                 && $arg_value_type->isSingleStringLiteral()
             ) {
                 $literal = $arg_value_type->getSingleStringLiteral();
@@ -1459,7 +1459,7 @@ class CallAnalyzer
     ) {
         $codebase = $statements_analyzer->getCodebase();
 
-        $arg_value_type = \Psalm\Type\Provider::getNodeType($arg->value);
+        $arg_value_type = $statements_analyzer->nodes->getNodeType($arg->value);
 
         if (!$arg_value_type) {
             if ($function_param && !$function_param->by_ref) {
@@ -1567,7 +1567,7 @@ class CallAnalyzer
                     || $arg->value instanceof PhpParser\Node\Expr\MethodCall
                     || $arg->value instanceof PhpParser\Node\Expr\StaticCall
                 ) && (
-                    !($arg_value_type = \Psalm\Type\Provider::getNodeType($arg->value))
+                    !($arg_value_type = $statements_analyzer->nodes->getNodeType($arg->value))
                     || !$arg_value_type->by_ref
                 )
             )
@@ -1626,7 +1626,7 @@ class CallAnalyzer
                         $by_ref_type,
                         $template_result,
                         $codebase,
-                        \Psalm\Type\Provider::getNodeType($arg->value),
+                        $statements_analyzer->nodes->getNodeType($arg->value),
                         null
                     );
 
@@ -1701,7 +1701,7 @@ class CallAnalyzer
 
             $empty_template_result = new TemplateResult($class_generic_params, $empty_generic_params);
 
-            $arg_value_type = \Psalm\Type\Provider::getNodeType($arg->value);
+            $arg_value_type = $statements_analyzer->nodes->getNodeType($arg->value);
 
             $param_type = UnionTemplateHandler::replaceTemplateTypesWithStandins(
                 $param_type,
@@ -1982,7 +1982,7 @@ class CallAnalyzer
              * @var ObjectLike|TArray|TList|null
              */
             $array_arg_type = $array_arg
-                    && ($arg_value_type = \Psalm\Type\Provider::getNodeType($array_arg))
+                    && ($arg_value_type = $statements_analyzer->nodes->getNodeType($array_arg))
                     && ($types = $arg_value_type->getTypes())
                     && isset($types['array'])
                 ? $types['array']
@@ -2004,7 +2004,7 @@ class CallAnalyzer
         $closure_arg_type = null;
 
         if ($closure_arg) {
-            $closure_arg_type = \Psalm\Type\Provider::getNodeType($closure_arg->value);
+            $closure_arg_type = $statements_analyzer->nodes->getNodeType($closure_arg->value);
         }
 
         if ($closure_arg && $closure_arg_type) {
@@ -3238,7 +3238,10 @@ class CallAnalyzer
             return [$fq_class_name . '::' . $method_name_arg->value];
         }
 
-        if (!($class_arg_type = \Psalm\Type\Provider::getNodeType($class_arg))
+        $class_arg_type = null;
+
+        if (!$file_source instanceof StatementsAnalyzer
+            || !($class_arg_type = $file_source->nodes->getNodeType($class_arg))
             || !$class_arg_type->hasObjectType()
         ) {
             return [];

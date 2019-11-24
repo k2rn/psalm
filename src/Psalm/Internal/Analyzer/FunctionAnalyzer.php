@@ -109,7 +109,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                     return Type::getArray();
 
                 case 'count':
-                    if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))) {
+                    if (($first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value))) {
                         $atomic_types = $first_arg_type->getTypes();
 
                         if (count($atomic_types) === 1) {
@@ -147,7 +147,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                 case 'highlight_string':
                 case 'highlight_file':
                     if (isset($call_args[1])
-                        && ($second_arg_type = \Psalm\Type\Provider::getNodeType($call_args[1]->value))
+                        && ($second_arg_type = $statements_analyzer->nodes->getNodeType($call_args[1]->value))
                     ) {
                         if ((string) $second_arg_type === 'true') {
                             return Type::getString();
@@ -163,7 +163,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
 
                 case 'print_r':
                     if (isset($call_args[1])
-                        && ($second_arg_type = \Psalm\Type\Provider::getNodeType($call_args[1]->value))
+                        && ($second_arg_type = $statements_analyzer->nodes->getNodeType($call_args[1]->value))
                     ) {
                         if ((string) $second_arg_type === 'true') {
                             return Type::getString();
@@ -176,7 +176,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                     ]);
 
                 case 'microtime':
-                    if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))) {
+                    if (($first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value))) {
                         if ((string) $first_arg_type === 'true') {
                             return Type::getFloat();
                         }
@@ -192,7 +192,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                     ]);
 
                 case 'hrtime':
-                    if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))) {
+                    if (($first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value))) {
                         if ((string) $first_arg_type === 'true') {
                             $int = Type::getInt();
                             $int->from_calculation = true;
@@ -225,7 +225,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                     return new Type\Union([new Type\Atomic\TString, new Type\Atomic\TFalse]);
 
                 case 'gettimeofday':
-                    if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))) {
+                    if (($first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value))) {
                         if ((string) $first_arg_type === 'true') {
                             return Type::getFloat();
                         }
@@ -260,7 +260,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                                     ? new Type\Atomic\TList(Type::getString())
                                     : new Type\Atomic\TNonEmptyList(Type::getString())
                             ]);
-                        } elseif (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+                        } elseif (($first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value))
                             && $first_arg_type->hasString()
                         ) {
                             $falsable_array = new Type\Union([
@@ -284,7 +284,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                     if (isset($call_args[0]->value)) {
                         $first_arg = $call_args[0]->value;
 
-                        if ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg)) {
+                        if ($first_arg_type = $statements_analyzer->nodes->getNodeType($first_arg)) {
                             $numeric_types = [];
 
                             foreach ($first_arg_type->getTypes() as $inner_type) {
@@ -306,7 +306,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                     if (isset($call_args[0])) {
                         $first_arg = $call_args[0]->value;
 
-                        if ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg)) {
+                        if ($first_arg_type = $statements_analyzer->nodes->getNodeType($first_arg)) {
                             if ($first_arg_type->hasArray()) {
                                 /** @psalm-suppress PossiblyUndefinedStringArrayOffset */
                                 $array_type = $first_arg_type->getTypes()['array'];
@@ -324,7 +324,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                             } elseif ($first_arg_type->hasScalarType()
                                 && isset($call_args[1])
                                 && ($second_arg = $call_args[1]->value)
-                                && ($second_arg_type = \Psalm\Type\Provider::getNodeType($second_arg))
+                                && ($second_arg_type = $statements_analyzer->nodes->getNodeType($second_arg))
                                 && $second_arg_type->hasScalarType()
                             ) {
                                 return Type::combineUnionTypes($first_arg_type, $second_arg_type);
@@ -338,7 +338,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
                     if (isset($call_args[1])) {
                         $second_arg = $call_args[1]->value;
 
-                        if (($second_arg_type = \Psalm\Type\Provider::getNodeType($second_arg))
+                        if (($second_arg_type = $statements_analyzer->nodes->getNodeType($second_arg))
                             && $second_arg_type->isSingleIntLiteral()
                         ) {
                             switch ($second_arg_type->getSingleIntLiteral()->value) {
@@ -416,7 +416,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
 
         switch ($function_id) {
             case 'htmlspecialchars':
-                if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+                if (($first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value))
                     && $first_arg_type->tainted
                 ) {
                     // input is now safe from tainted sql and html
@@ -431,7 +431,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
             case 'sprintf':
             case 'preg_quote':
             case 'substr':
-                if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+                if (($first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value))
                     && $first_arg_type->tainted
                 ) {
                     $return_type->tainted = $first_arg_type->tainted;
@@ -442,8 +442,8 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
 
             case 'str_replace':
             case 'preg_replace':
-                $first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value);
-                $third_arg_type = \Psalm\Type\Provider::getNodeType($call_args[2]->value);
+                $first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value);
+                $third_arg_type = $statements_analyzer->nodes->getNodeType($call_args[2]->value);
 
                 $first_arg_taint = $first_arg_type->tainted ?? 0;
                 $third_arg_taint = $third_arg_type->tainted ?? 0;
@@ -456,7 +456,7 @@ class FunctionAnalyzer extends FunctionLikeAnalyzer
 
             case 'htmlentities':
             case 'striptags':
-                if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+                if (($first_arg_type = $statements_analyzer->nodes->getNodeType($call_args[0]->value))
                     && $first_arg_type->tainted
                 ) {
                     // input is now safe from tainted html

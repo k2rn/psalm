@@ -34,8 +34,12 @@ class ParseUrlReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnTyp
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         if (count($call_args) > 1) {
-            if ($component_type = \Psalm\Type\Provider::getNodeType($call_args[1]->value)) {
+            if ($component_type = $statements_source->nodes->getNodeType($call_args[1]->value)) {
                 if (!$component_type->hasMixed()) {
                     $codebase = $statements_source->getCodebase();
 

@@ -68,7 +68,7 @@ class WhileAnalyzer
 
         $always_enters_loop = false;
 
-        if ($stmt_cond_type = \Psalm\Type\Provider::getNodeType($stmt->cond)) {
+        if ($stmt_cond_type = $statements_analyzer->nodes->getNodeType($stmt->cond)) {
             $always_enters_loop = true;
 
             foreach ($stmt_cond_type->getTypes() as $iterator_type) {

@@ -27,10 +27,13 @@ class PdoStatementSetFetchMode implements \Psalm\Plugin\Hook\MethodParamsProvide
         Context $context = null,
         CodeLocation $code_location = null
     ) {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return null;
+        }
+
         if ($method_name_lowercase === 'setfetchmode') {
             if (!$context
                 || !$call_args
-                || !$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer
                 || \Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer::analyze(
                     $statements_source,
                     $call_args[0]->value,
@@ -40,7 +43,7 @@ class PdoStatementSetFetchMode implements \Psalm\Plugin\Hook\MethodParamsProvide
                 return;
             }
 
-            if (($first_call_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+            if (($first_call_arg_type = $statements_source->nodes->getNodeType($call_args[0]->value))
                 && $first_call_arg_type->isSingleIntLiteral()
             ) {
                 $params = [

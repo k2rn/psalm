@@ -49,8 +49,12 @@ class CallMap
      *
      * @return TCallable
      */
-    public static function getCallableFromCallMapById(Codebase $codebase, $method_id, array $args)
-    {
+    public static function getCallableFromCallMapById(
+        Codebase $codebase,
+        $method_id,
+        array $args,
+        ?\Psalm\Type\Provider $nodes
+    ) {
         $possible_callables = self::getCallablesFromCallMap($method_id);
 
         if ($possible_callables === null) {
@@ -59,7 +63,12 @@ class CallMap
             );
         }
 
-        return self::getMatchingCallableFromCallMapOptions($codebase, $possible_callables, $args);
+        return self::getMatchingCallableFromCallMapOptions(
+            $codebase,
+            $possible_callables,
+            $args,
+            $nodes
+        );
     }
 
     /**
@@ -71,7 +80,8 @@ class CallMap
     public static function getMatchingCallableFromCallMapOptions(
         Codebase $codebase,
         array $callables,
-        array $args
+        array $args,
+        ?\Psalm\Type\Provider $nodes
     ) {
         if (count($callables) === 1) {
             return $callables[0];
@@ -121,7 +131,11 @@ class CallMap
                     continue;
                 }
 
-                if (!($arg_type = \Psalm\Type\Provider::getNodeType($arg->value))) {
+                $arg_type = null;
+
+                if (!$nodes
+                    || !($arg_type = $nodes->getNodeType($arg->value))
+                ) {
                     continue;
                 }
 

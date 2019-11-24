@@ -26,10 +26,14 @@ class ArrayColumnReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         $row_shape = null;
 
         // calculate row shape
-        if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+        if (($first_arg_type = $statements_source->nodes->getNodeType($call_args[0]->value))
             && $first_arg_type->isSingle()
             && $first_arg_type->hasArray()
         ) {
@@ -54,7 +58,7 @@ class ArrayColumnReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
 
         $value_column_name = null;
         // calculate value column name
-        if (($second_arg_type = \Psalm\Type\Provider::getNodeType($call_args[1]->value))) {
+        if (($second_arg_type = $statements_source->nodes->getNodeType($call_args[1]->value))) {
             if ($second_arg_type->isSingleIntLiteral()) {
                 $value_column_name = $second_arg_type->getSingleIntLiteral()->value;
             } elseif ($second_arg_type->isSingleStringLiteral()) {
@@ -65,7 +69,7 @@ class ArrayColumnReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
         $key_column_name = null;
         // calculate key column name
         if (isset($call_args[2])
-            && ($third_arg_type = \Psalm\Type\Provider::getNodeType($call_args[2]->value))
+            && ($third_arg_type = $statements_source->nodes->getNodeType($call_args[2]->value))
         ) {
             if ($third_arg_type->isSingleIntLiteral()) {
                 $key_column_name = $third_arg_type->getSingleIntLiteral()->value;

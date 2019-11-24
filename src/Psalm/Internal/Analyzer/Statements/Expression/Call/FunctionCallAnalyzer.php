@@ -96,7 +96,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                 $context->inside_call = false;
             }
 
-            if ($stmt_name_type = \Psalm\Type\Provider::getNodeType($stmt->name)) {
+            if ($stmt_name_type = $statements_analyzer->nodes->getNodeType($stmt->name)) {
                 if ($stmt_name_type->isNull()) {
                     if (IssueBuffer::accepts(
                         new NullFunctionCall(
@@ -130,8 +130,10 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                     if ($var_type_part instanceof Type\Atomic\TFn || $var_type_part instanceof Type\Atomic\TCallable) {
                         $function_params = $var_type_part->params;
 
-                        if (($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) && $var_type_part->return_type) {
-                            \Psalm\Type\Provider::setNodeType(
+                        if (($stmt_type = $statements_analyzer->nodes->getNodeType($stmt))
+                            && $var_type_part->return_type
+                        ) {
+                            $statements_analyzer->nodes->setNodeType(
                                 $stmt,
                                 Type::combineUnionTypes(
                                     $stmt_type,
@@ -139,7 +141,10 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                                 )
                             );
                         } else {
-                            \Psalm\Type\Provider::setNodeType($stmt, $var_type_part->return_type ?: Type::getMixed());
+                            $statements_analyzer->nodes->setNodeType(
+                                $stmt,
+                                $var_type_part->return_type ?: Type::getMixed()
+                            );
                         }
 
                         $function_exists = true;
@@ -210,18 +215,18 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                             $statements_analyzer->removeSuppressedIssues(['InternalMethod']);
                         }
 
-                        if ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
-                            \Psalm\Type\Provider::setNodeType(
+                        if ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt)) {
+                            $statements_analyzer->nodes->setNodeType(
                                 $stmt,
                                 Type::combineUnionTypes(
-                                    \Psalm\Type\Provider::getNodeType($fake_method_call) ?: Type::getMixed(),
+                                    $statements_analyzer->nodes->getNodeType($fake_method_call) ?: Type::getMixed(),
                                     $stmt_type
                                 )
                             );
                         } else {
-                            \Psalm\Type\Provider::setNodeType(
+                            $statements_analyzer->nodes->setNodeType(
                                 $stmt,
-                                \Psalm\Type\Provider::getNodeType($fake_method_call) ?: Type::getMixed()
+                                $statements_analyzer->nodes->getNodeType($fake_method_call) ?: Type::getMixed()
                             );
                         }
                     }
@@ -254,8 +259,8 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                 }
             }
 
-            if (!\Psalm\Type\Provider::getNodeType($stmt)) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+            if (!$statements_analyzer->nodes->getNodeType($stmt)) {
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
             }
         } else {
             $original_function_id = implode('\\', $stmt->name->parts);
@@ -360,7 +365,8 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                         $function_callable = \Psalm\Internal\Codebase\CallMap::getCallableFromCallMapById(
                             $codebase,
                             $function_id,
-                            $stmt->args
+                            $stmt->args,
+                            $statements_analyzer->nodes
                         );
 
                         $function_params = $function_callable->params;
@@ -412,7 +418,8 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                     $function_callable = \Psalm\Internal\Codebase\CallMap::getCallableFromCallMapById(
                         $codebase,
                         $function_id,
-                        $stmt->args
+                        $stmt->args,
+                        $statements_analyzer->nodes
                     );
 
                     $function_params = $function_callable->params;
@@ -507,7 +514,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                                     throw new \UnexpectedValueException('$return_type shouldn’t be null here');
                                 }
 
-                                \Psalm\Type\Provider::setNodeType($stmt, $return_type);
+                                $statements_analyzer->nodes->setNodeType($stmt, $return_type);
                                 $return_type->by_ref = $function_storage->returns_by_ref;
 
                                 // only check the type locally if it's defined externally
@@ -525,7 +532,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                             }
                         } catch (\InvalidArgumentException $e) {
                             // this can happen when the function was defined in the Config startup script
-                            \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                            $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
                         }
                     } else {
                         $stmt_type = FunctionAnalyzer::getReturnTypeFromCallMapWithArgs(
@@ -547,7 +554,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                 }
 
                 if ($stmt_type) {
-                    \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                    $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
                 }
             }
 
@@ -620,9 +627,9 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                         ? new Type\Atomic\GetClassT($var_id, $context->vars_in_scope[$var_id])
                         : new Type\Atomic\GetTypeT($var_id);
 
-                    \Psalm\Type\Provider::setNodeType($stmt, new Type\Union([$atomic_type]));
+                    $statements_analyzer->nodes->setNodeType($stmt, new Type\Union([$atomic_type]));
                 }
-            } elseif ($var_type = \Psalm\Type\Provider::getNodeType($var)) {
+            } elseif ($var_type = $statements_analyzer->nodes->getNodeType($var)) {
                 $class_string_types = [];
 
                 foreach ($var_type->getTypes() as $class_type) {
@@ -632,7 +639,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                 }
 
                 if ($class_string_types) {
-                    \Psalm\Type\Provider::setNodeType($stmt, new Type\Union($class_string_types));
+                    $statements_analyzer->nodes->setNodeType($stmt, new Type\Union($class_string_types));
                 }
             }
         }
@@ -640,7 +647,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
         if ($codebase->store_node_types
             && !$context->collect_initializations
             && !$context->collect_mutations
-            && ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt))
+            && ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt))
         ) {
             $codebase->analyzer->addNodeType(
                 $statements_analyzer->getFilePath(),
@@ -722,7 +729,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
             }
 
             if ($function_storage->if_true_assertions) {
-                \Psalm\Type\Provider::setNodeIfTrueAssertions(
+                $statements_analyzer->nodes->setNodeIfTrueAssertions(
                     $stmt,
                     array_map(
                         function (Assertion $assertion) use ($generic_params) : Assertion {
@@ -734,7 +741,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
             }
 
             if ($function_storage->if_false_assertions) {
-                \Psalm\Type\Provider::setNodeIfFalseAssertions(
+                $statements_analyzer->nodes->setNodeIfFalseAssertions(
                     $stmt,
                     array_map(
                         function (Assertion $assertion) use ($generic_params) : Assertion {
@@ -856,6 +863,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                 if ($first_arg) {
                     $fq_const_name = StatementsAnalyzer::getConstName(
                         $first_arg->value,
+                        $statements_analyzer->nodes,
                         $codebase,
                         $statements_analyzer->getAliases()
                     );
@@ -868,7 +876,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
 
                         $statements_analyzer->setConstType(
                             $fq_const_name,
-                            \Psalm\Type\Provider::getNodeType($second_arg->value) ?: Type::getMixed(),
+                            $statements_analyzer->nodes->getNodeType($second_arg->value) ?: Type::getMixed(),
                             $context
                         );
                     }
@@ -880,7 +888,7 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
                 && strpos($function_id, 'is_') === 0
                 && $function_id !== 'is_a'
             ) {
-                $stmt_assertions = \Psalm\Type\Provider::getNodeAssertions($stmt);
+                $stmt_assertions = $statements_analyzer->nodes->getNodeAssertions($stmt);
 
                 if ($stmt_assertions !== null) {
                     $assertions = $stmt_assertions;
@@ -921,11 +929,11 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
             && $function_id
             && $in_call_map
             && $codebase->functions->isCallMapFunctionPure($codebase, $function_id, $stmt->args)
-            && ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt))
+            && ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt))
         ) {
             if ($function_id === 'substr'
                 && isset($stmt->args[0])
-                && ($first_arg_type = \Psalm\Type\Provider::getNodeType($stmt->args[0]->value))
+                && ($first_arg_type = $statements_analyzer->nodes->getNodeType($stmt->args[0]->value))
             ) {
                 $stmt_type->sources = $first_arg_type->sources ?? null;
                 $stmt_type->tainted = $first_arg_type->tainted ?? null;
@@ -934,8 +942,8 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
             if (($function_id === 'str_replace' || $function_id === 'preg_replace')
                 && count($stmt->args) >= 3
             ) {
-                $second_arg_type = \Psalm\Type\Provider::getNodeType($stmt->args[1]->value);
-                $third_arg_type = \Psalm\Type\Provider::getNodeType($stmt->args[2]->value);
+                $second_arg_type = $statements_analyzer->nodes->getNodeType($stmt->args[1]->value);
+                $third_arg_type = $statements_analyzer->nodes->getNodeType($stmt->args[2]->value);
 
                 $stmt_type->sources = array_merge(
                     $second_arg_type->sources ?? [],
@@ -946,8 +954,8 @@ class FunctionCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expressio
             }
         }
 
-        if (!\Psalm\Type\Provider::getNodeType($stmt)) {
-            \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+        if (!$statements_analyzer->nodes->getNodeType($stmt)) {
+            $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
         }
 
         return null;

@@ -34,6 +34,10 @@ class ArrayReduceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         if (!isset($call_args[0]) || !isset($call_args[1])) {
             return Type::getMixed();
         }
@@ -43,8 +47,8 @@ class ArrayReduceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
         $array_arg = $call_args[0]->value;
         $function_call_arg = $call_args[1]->value;
 
-        $array_arg_type = \Psalm\Type\Provider::getNodeType($array_arg);
-        $function_call_arg_type = \Psalm\Type\Provider::getNodeType($function_call_arg);
+        $array_arg_type = $statements_source->nodes->getNodeType($array_arg);
+        $function_call_arg_type = $statements_source->nodes->getNodeType($function_call_arg);
 
         if (!$array_arg_type || !$function_call_arg_type) {
             return Type::getMixed();
@@ -75,7 +79,7 @@ class ArrayReduceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
             $reduce_return_type = Type::getNull();
             $reduce_return_type->ignore_nullable_issues = true;
         } else {
-            $reduce_return_type = \Psalm\Type\Provider::getNodeType($call_args[2]->value);
+            $reduce_return_type = $statements_source->nodes->getNodeType($call_args[2]->value);
 
             if (!$reduce_return_type) {
                 return Type::getMixed();
@@ -244,11 +248,10 @@ class ArrayReduceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
                                 $return_type
                             );
                         } else {
-                            if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer
-                                || !$codebase->functions->functionExists(
-                                    $statements_source,
-                                    $mapping_function_id_part
-                                )
+                            if (!$codebase->functions->functionExists(
+                                $statements_source,
+                                $mapping_function_id_part
+                            )
                             ) {
                                 return Type::getMixed();
                             }

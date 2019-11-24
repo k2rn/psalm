@@ -60,7 +60,7 @@ class ArrayAssignmentAnalyzer
             $context
         );
 
-        if (!\Psalm\Type\Provider::getNodeType($stmt->var) && $var_id) {
+        if (!$statements_analyzer->nodes->getNodeType($stmt->var) && $var_id) {
             $context->vars_in_scope[$var_id] = Type::getMixed();
         }
     }
@@ -99,7 +99,7 @@ class ArrayAssignmentAnalyzer
 
         $codebase = $statements_analyzer->getCodebase();
 
-        $root_type = \Psalm\Type\Provider::getNodeType($root_array_expr) ?: Type::getMixed();
+        $root_type = $statements_analyzer->nodes->getNodeType($root_array_expr) ?: Type::getMixed();
 
         if ($root_type->hasMixed()) {
             if (ExpressionAnalyzer::analyze(
@@ -152,7 +152,7 @@ class ArrayAssignmentAnalyzer
 
         if ($codebase->taint
             && $assign_value
-            && ($assign_value_type = \Psalm\Type\Provider::getNodeType($assign_value))
+            && ($assign_value_type = $statements_analyzer->nodes->getNodeType($assign_value))
         ) {
             $taint_sources = $assign_value_type->sources;
             $taint_type = $assign_value_type->tainted ?: 0;
@@ -178,7 +178,7 @@ class ArrayAssignmentAnalyzer
                     return false;
                 }
 
-                if (!($child_stmt_dim_type = \Psalm\Type\Provider::getNodeType($child_stmt->dim))) {
+                if (!($child_stmt_dim_type = $statements_analyzer->nodes->getNodeType($child_stmt->dim))) {
                     return null;
                 }
 
@@ -232,20 +232,20 @@ class ArrayAssignmentAnalyzer
                 $full_var_id = false;
             }
 
-            if (!($child_stmt_var_type = \Psalm\Type\Provider::getNodeType($child_stmt->var))) {
+            if (!($child_stmt_var_type = $statements_analyzer->nodes->getNodeType($child_stmt->var))) {
                 return null;
             }
 
             if ($child_stmt_var_type->isEmpty()) {
                 $child_stmt_var_type = Type::getEmptyArray();
-                \Psalm\Type\Provider::setNodeType($child_stmt->var, $child_stmt_var_type);
+                $statements_analyzer->nodes->setNodeType($child_stmt->var, $child_stmt_var_type);
             }
 
             $array_var_id = $root_var_id . implode('', $var_id_additions);
 
             if ($parent_var_id && isset($context->vars_in_scope[$parent_var_id])) {
                 $child_stmt_var_type = clone $context->vars_in_scope[$parent_var_id];
-                \Psalm\Type\Provider::setNodeType($child_stmt->var, $child_stmt_var_type);
+                $statements_analyzer->nodes->setNodeType($child_stmt->var, $child_stmt_var_type);
             }
 
             $array_type = clone $child_stmt_var_type;
@@ -262,14 +262,14 @@ class ArrayAssignmentAnalyzer
                 $child_stmts ? null : $assignment_type
             );
 
-            \Psalm\Type\Provider::setNodeType(
+            $statements_analyzer->nodes->setNodeType(
                 $child_stmt,
                 $child_stmt_type
             );
 
             $child_stmt_var_type = $array_type;
 
-            \Psalm\Type\Provider::setNodeType($child_stmt->var, $array_type);
+            $statements_analyzer->nodes->setNodeType($child_stmt->var, $array_type);
 
             if ($root_var_id) {
                 if (!$parent_var_id) {
@@ -284,7 +284,7 @@ class ArrayAssignmentAnalyzer
 
             if (!$child_stmts) {
                 $child_stmt_type = $assignment_type;
-                \Psalm\Type\Provider::setNodeType($child_stmt, $assignment_type);
+                $statements_analyzer->nodes->setNodeType($child_stmt, $assignment_type);
             }
 
             $current_type = $child_stmt_type;
@@ -316,7 +316,7 @@ class ArrayAssignmentAnalyzer
         if ($root_var_id
             && $full_var_id
             && $child_stmt
-            && ($child_stmt_var_type = \Psalm\Type\Provider::getNodeType($child_stmt->var))
+            && ($child_stmt_var_type = $statements_analyzer->nodes->getNodeType($child_stmt->var))
             && !$child_stmt_var_type->hasObjectType()
         ) {
             $array_var_id = $root_var_id . implode('', $var_id_additions);
@@ -325,7 +325,7 @@ class ArrayAssignmentAnalyzer
 
         // only update as many child stmts are we were able to process above
         foreach ($reversed_child_stmts as $child_stmt) {
-            $child_stmt_type = \Psalm\Type\Provider::getNodeType($child_stmt);
+            $child_stmt_type = $statements_analyzer->nodes->getNodeType($child_stmt);
 
             if (!$child_stmt_type) {
                 throw new \InvalidArgumentException('Should never get here');
@@ -338,7 +338,7 @@ class ArrayAssignmentAnalyzer
             ) {
                 $key_value = $current_dim->value;
             } elseif ($current_dim instanceof PhpParser\Node\Expr\ConstFetch
-                && ($current_dim_type = \Psalm\Type\Provider::getNodeType($current_dim))
+                && ($current_dim_type = $statements_analyzer->nodes->getNodeType($current_dim))
             ) {
                 $is_single_string_literal = $current_dim_type->isSingleStringLiteral();
 
@@ -402,7 +402,7 @@ class ArrayAssignmentAnalyzer
                 } else {
                     $array_assignment_type = new Type\Union([
                         new TArray([
-                            \Psalm\Type\Provider::getNodeType($current_dim) ?: Type::getMixed(),
+                            $statements_analyzer->nodes->getNodeType($current_dim) ?: Type::getMixed(),
                             $current_type,
                         ]),
                     ]);
@@ -422,7 +422,7 @@ class ArrayAssignmentAnalyzer
 
             if (!$child_stmt_type->hasObjectType()) {
                 $child_stmt_type = $new_child_type;
-                \Psalm\Type\Provider::setNodeType($child_stmt, $new_child_type);
+                $statements_analyzer->nodes->setNodeType($child_stmt, $new_child_type);
             }
 
             $current_type = $child_stmt_type;
@@ -444,7 +444,7 @@ class ArrayAssignmentAnalyzer
         ) {
             $key_value = $current_dim->value;
         } elseif ($current_dim instanceof PhpParser\Node\Expr\ConstFetch
-            && ($current_dim_type = \Psalm\Type\Provider::getNodeType($current_dim))
+            && ($current_dim_type = $statements_analyzer->nodes->getNodeType($current_dim))
             && !$root_is_string
         ) {
             $is_single_string_literal = $current_dim_type->isSingleStringLiteral();
@@ -501,7 +501,7 @@ class ArrayAssignmentAnalyzer
             }
         } elseif (!$root_is_string) {
             if ($current_dim) {
-                if ($current_dim_type = \Psalm\Type\Provider::getNodeType($current_dim)) {
+                if ($current_dim_type = $statements_analyzer->nodes->getNodeType($current_dim)) {
                     $array_atomic_key_type = ArrayFetchAnalyzer::replaceOffsetTypeWithInts(
                         $current_dim_type
                     );
@@ -594,7 +594,7 @@ class ArrayAssignmentAnalyzer
             $root_type->tainted = $taint_type | $root_type->tainted;
         }
 
-        \Psalm\Type\Provider::setNodeType($root_array_expr, $root_type);
+        $statements_analyzer->nodes->setNodeType($root_array_expr, $root_type);
 
         if ($root_array_expr instanceof PhpParser\Node\Expr\PropertyFetch) {
             if ($root_array_expr->name instanceof PhpParser\Node\Identifier) {

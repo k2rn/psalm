@@ -27,9 +27,11 @@ class EchoChecker implements AfterStatementAnalysisInterface
         Codebase $codebase,
         array &$file_replacements = []
     ) {
-        if ($stmt instanceof PhpParser\Node\Stmt\Echo_) {
+        if ($stmt instanceof PhpParser\Node\Stmt\Echo_
+            && $statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer
+        ) {
             foreach ($stmt->exprs as $expr) {
-                $expr_type = \Psalm\Type\Provider::getNodeType($expr);
+                $expr_type = $statements_source->nodes->getNodeType($expr);
 
                 if (!$expr_type || $expr_type->hasMixed()) {
                     if (IssueBuffer::accepts(

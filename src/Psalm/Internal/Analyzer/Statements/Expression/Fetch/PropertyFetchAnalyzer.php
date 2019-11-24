@@ -70,7 +70,7 @@ class PropertyFetchAnalyzer
 
         if ($stmt->name instanceof PhpParser\Node\Identifier) {
             $prop_name = $stmt->name->name;
-        } elseif (($stmt_name_type = \Psalm\Type\Provider::getNodeType($stmt->name))
+        } elseif (($stmt_name_type = $statements_analyzer->nodes->getNodeType($stmt->name))
             && $stmt_name_type->isSingleStringLiteral()
         ) {
             $prop_name = $stmt_name_type->getSingleStringLiteral()->value;
@@ -98,7 +98,7 @@ class PropertyFetchAnalyzer
             $stmt_type = $context->vars_in_scope[$var_id];
 
             // we don't need to check anything
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
             if (!$context->collect_initializations
                 && !$context->collect_mutations
@@ -124,7 +124,7 @@ class PropertyFetchAnalyzer
             if ($stmt_var_id === '$this'
                 && !$stmt_type->initialized
                 && $context->collect_initializations
-                && ($stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var))
+                && ($stmt_var_type = $statements_analyzer->nodes->getNodeType($stmt->var))
                 && $stmt_var_type->hasObjectType()
                 && $stmt->name instanceof PhpParser\Node\Identifier
             ) {
@@ -162,7 +162,7 @@ class PropertyFetchAnalyzer
                 }
             }
 
-            if (($stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var))
+            if (($stmt_var_type = $statements_analyzer->nodes->getNodeType($stmt->var))
                 && $stmt_var_type->hasObjectType()
                 && $stmt->name instanceof PhpParser\Node\Identifier
             ) {
@@ -207,7 +207,7 @@ class PropertyFetchAnalyzer
         if ($stmt_var_id && $context->hasVariable($stmt_var_id, $statements_analyzer)) {
             $stmt_var_type = $context->vars_in_scope[$stmt_var_id];
         } else {
-            $stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var);
+            $stmt_var_type = $statements_analyzer->nodes->getNodeType($stmt->var);
         }
 
         if (!$stmt_var_type) {
@@ -271,7 +271,7 @@ class PropertyFetchAnalyzer
             }
 
             if ($stmt_var_type->hasMixed()) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
 
                 if ($codebase->store_node_types
                     && !$context->collect_initializations
@@ -310,7 +310,7 @@ class PropertyFetchAnalyzer
                     // fall through
                 }
             } else {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getNull());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getNull());
             }
         }
 
@@ -352,7 +352,7 @@ class PropertyFetchAnalyzer
             }
 
             if ($lhs_type_part instanceof Type\Atomic\TMixed) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
                 continue;
             }
 
@@ -371,8 +371,8 @@ class PropertyFetchAnalyzer
             if ($lhs_type_part instanceof TObjectWithProperties
                 && isset($lhs_type_part->properties[$prop_name])
             ) {
-                if ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
-                    \Psalm\Type\Provider::setNodeType(
+                if ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt)) {
+                    $statements_analyzer->nodes->setNodeType(
                         $stmt,
                         Type::combineUnionTypes(
                             $lhs_type_part->properties[$prop_name],
@@ -380,7 +380,7 @@ class PropertyFetchAnalyzer
                         )
                     );
                 } else {
-                    \Psalm\Type\Provider::setNodeType($stmt, $lhs_type_part->properties[$prop_name]);
+                    $statements_analyzer->nodes->setNodeType($stmt, $lhs_type_part->properties[$prop_name]);
                 }
 
                 continue;
@@ -392,13 +392,13 @@ class PropertyFetchAnalyzer
             if ($lhs_type_part instanceof TObject
                 || in_array(strtolower($lhs_type_part->value), ['stdclass', 'simplexmlelement'], true)
             ) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
 
                 continue;
             }
 
             if (ExpressionAnalyzer::isMock($lhs_type_part->value)) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
                 continue;
             }
 
@@ -498,7 +498,7 @@ class PropertyFetchAnalyzer
                 if (isset($class_storage->pseudo_property_get_types['$' . $prop_name])) {
                     $stmt_type = clone $class_storage->pseudo_property_get_types['$' . $prop_name];
 
-                    \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                    $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
                     self::processTaints($statements_analyzer, $stmt, $stmt_type, $property_id);
                     continue;
@@ -542,10 +542,10 @@ class PropertyFetchAnalyzer
                     $statements_analyzer->removeSuppressedIssues(['InternalMethod']);
                 }
 
-                if ($fake_method_call_type = \Psalm\Type\Provider::getNodeType($fake_method_call)) {
-                    \Psalm\Type\Provider::setNodeType($stmt, $fake_method_call_type);
+                if ($fake_method_call_type = $statements_analyzer->nodes->getNodeType($fake_method_call)) {
+                    $statements_analyzer->nodes->setNodeType($stmt, $fake_method_call_type);
                 } else {
-                    \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                    $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
                 }
 
                 $property_id = $lhs_type_part->value . '::$' . $prop_name;
@@ -637,7 +637,7 @@ class PropertyFetchAnalyzer
 
                     $stmt_type = Type::getMixed();
 
-                    \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                    $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
                     if ($var_id) {
                         $context->vars_in_scope[$var_id] = $stmt_type;
@@ -806,14 +806,17 @@ class PropertyFetchAnalyzer
 
             self::processTaints($statements_analyzer, $stmt, $class_property_type, $property_id);
 
-            if ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::combineUnionTypes($class_property_type, $stmt_type));
+            if ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt)) {
+                $statements_analyzer->nodes->setNodeType(
+                    $stmt,
+                    Type::combineUnionTypes($class_property_type, $stmt_type)
+                );
             } else {
-                \Psalm\Type\Provider::setNodeType($stmt, $class_property_type);
+                $statements_analyzer->nodes->setNodeType($stmt, $class_property_type);
             }
         }
 
-        $stmt_type = \Psalm\Type\Provider::getNodeType($stmt);
+        $stmt_type = $statements_analyzer->nodes->getNodeType($stmt);
 
         if ($stmt_var_type->isNullable() && !$context->inside_isset && $stmt_type) {
             $stmt_type->addType(new TNull);
@@ -826,7 +829,7 @@ class PropertyFetchAnalyzer
         if ($codebase->store_node_types
             && !$context->collect_initializations
             && !$context->collect_mutations
-            && ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt))
+            && ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt))
         ) {
             $codebase->analyzer->addNodeType(
                 $statements_analyzer->getFilePath(),
@@ -862,7 +865,7 @@ class PropertyFetchAnalyzer
         }
 
         if ($var_id) {
-            $context->vars_in_scope[$var_id] = \Psalm\Type\Provider::getNodeType($stmt) ?: Type::getMixed();
+            $context->vars_in_scope[$var_id] = $statements_analyzer->nodes->getNodeType($stmt) ?: Type::getMixed();
         }
     }
 
@@ -991,7 +994,7 @@ class PropertyFetchAnalyzer
             }
 
             if ($fq_class_name) {
-                \Psalm\Type\Provider::setNodeType(
+                $statements_analyzer->nodes->setNodeType(
                     $stmt->class,
                     new Type\Union([new TNamedObject($fq_class_name)])
                 );
@@ -1000,7 +1003,7 @@ class PropertyFetchAnalyzer
 
         if ($stmt->name instanceof PhpParser\Node\VarLikeIdentifier) {
             $prop_name = $stmt->name->name;
-        } elseif (($stmt_name_type = \Psalm\Type\Provider::getNodeType($stmt->name))
+        } elseif (($stmt_name_type = $statements_analyzer->nodes->getNodeType($stmt->name))
             && $stmt_name_type->isSingleStringLiteral()
         ) {
             $prop_name = $stmt_name_type->getSingleStringLiteral()->value;
@@ -1050,7 +1053,7 @@ class PropertyFetchAnalyzer
             $stmt_type = $context->vars_in_scope[$var_id];
 
             // we don't need to check anything
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
             if ($context->collect_references) {
                 // log the appearance
@@ -1066,7 +1069,7 @@ class PropertyFetchAnalyzer
             if ($codebase->store_node_types
                 && !$context->collect_initializations
                 && !$context->collect_mutations
-                && ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt))
+                && ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt))
             ) {
                 $codebase->analyzer->addNodeType(
                     $statements_analyzer->getFilePath(),
@@ -1177,7 +1180,7 @@ class PropertyFetchAnalyzer
 
             $stmt_type = clone $context->vars_in_scope[$var_id];
 
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
             if ($codebase->store_node_types
                 && !$context->collect_initializations
@@ -1190,7 +1193,7 @@ class PropertyFetchAnalyzer
                 );
             }
         } else {
-            \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+            $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
         }
 
         return null;

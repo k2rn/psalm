@@ -174,14 +174,26 @@ class Algebra
             if ($conditional->expr instanceof PhpParser\Node\Expr\Isset_
                 && count($conditional->expr->vars) > 1
             ) {
-                $assertions = AssertionFinder::scrapeAssertions(
-                    $conditional->expr,
-                    $this_class_name,
-                    $source,
-                    $codebase,
-                    $inside_negation,
-                    $cache
-                );
+                $assertions = null;
+
+                if ($cache && $source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+                    $assertions = $source->nodes->getNodeAssertions($conditional->expr);
+                }
+
+                if ($assertions === null) {
+                    $assertions = AssertionFinder::scrapeAssertions(
+                        $conditional->expr,
+                        $this_class_name,
+                        $source,
+                        $codebase,
+                        $inside_negation,
+                        $cache
+                    );
+
+                    if ($cache && $source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+                        $source->nodes->setNodeAssertions($conditional->expr, $assertions);
+                    }
+                }
 
                 if ($assertions !== null) {
                     $clauses = [];
@@ -263,14 +275,26 @@ class Algebra
             }
         }
 
-        $assertions = AssertionFinder::scrapeAssertions(
-            $conditional,
-            $this_class_name,
-            $source,
-            $codebase,
-            $inside_negation,
-            $cache
-        );
+        $assertions = null;
+
+        if ($cache && $source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            $assertions = $source->nodes->getNodeAssertions($conditional);
+        }
+
+        if ($assertions === null) {
+            $assertions = AssertionFinder::scrapeAssertions(
+                $conditional,
+                $this_class_name,
+                $source,
+                $codebase,
+                $inside_negation,
+                $cache
+            );
+
+            if ($cache && $source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+                $source->nodes->setNodeAssertions($conditional, $assertions);
+            }
+        }
 
         if ($assertions) {
             $clauses = [];

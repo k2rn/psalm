@@ -3,7 +3,6 @@ namespace Psalm\Example\Plugin;
 
 use PhpParser;
 use Psalm\Checker;
-use Psalm\Checker\StatementsChecker;
 use Psalm\Codebase;
 use Psalm\CodeLocation;
 use Psalm\Context;
@@ -35,7 +34,8 @@ class PreventFloatAssignmentChecker implements AfterExpressionAnalysisInterface
         array &$file_replacements = []
     ) {
         if ($expr instanceof PhpParser\Node\Expr\Assign
-            && ($expr_type = \Psalm\Type\Provider::getNodeType($expr))
+            && $statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer
+            && ($expr_type = $statements_source->nodes->getNodeType($expr))
             && $expr_type->hasFloat()
         ) {
             if (\Psalm\IssueBuffer::accepts(

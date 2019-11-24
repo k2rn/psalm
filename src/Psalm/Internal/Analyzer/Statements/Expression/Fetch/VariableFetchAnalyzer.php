@@ -76,12 +76,12 @@ class VariableFetchAnalyzer
                 return null;
             }
 
-            \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope['$this']);
+            $statements_analyzer->nodes->setNodeType($stmt, clone $context->vars_in_scope['$this']);
 
             if ($codebase->store_node_types
                     && !$context->collect_initializations
                     && !$context->collect_mutations
-                && ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt))
+                && ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt))
             ) {
                 $codebase->analyzer->addNodeType(
                     $statements_analyzer->getFilePath(),
@@ -100,12 +100,12 @@ class VariableFetchAnalyzer
                 if (!$context->hasVariable($var_name, $statements_analyzer)) {
                     $context->vars_in_scope[$var_name] = Type::getMixed();
                     $context->vars_possibly_in_scope[$var_name] = true;
-                    \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                    $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
                 } else {
-                    \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope[$var_name]);
+                    $statements_analyzer->nodes->setNodeType($stmt, clone $context->vars_in_scope[$var_name]);
                 }
             } else {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
             }
 
             return null;
@@ -115,14 +115,14 @@ class VariableFetchAnalyzer
             $var_name = '$' . $stmt->name;
 
             if (isset($context->vars_in_scope[$var_name])) {
-                \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope[$var_name]);
+                $statements_analyzer->nodes->setNodeType($stmt, clone $context->vars_in_scope[$var_name]);
 
                 return null;
             }
 
             $type = $statements_analyzer->getGlobalType($var_name);
 
-            \Psalm\Type\Provider::setNodeType($stmt, $type);
+            $statements_analyzer->nodes->setNodeType($stmt, $type);
             $context->vars_in_scope[$var_name] = clone $type;
             $context->vars_possibly_in_scope[$var_name] = true;
 
@@ -180,7 +180,7 @@ class VariableFetchAnalyzer
                             return false;
                         }
 
-                        \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                        $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
 
                         return null;
                     }
@@ -195,7 +195,7 @@ class VariableFetchAnalyzer
                         // fall through
                     }
 
-                    \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                    $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
 
                     return false;
                 }
@@ -272,7 +272,7 @@ class VariableFetchAnalyzer
         } else {
             $stmt_type = clone $context->vars_in_scope[$var_name];
 
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
             if ($stmt_type->possibly_undefined_from_try && !$context->inside_isset) {
                 if ($context->is_global) {

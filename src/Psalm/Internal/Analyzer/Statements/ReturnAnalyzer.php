@@ -127,8 +127,8 @@ class ReturnAnalyzer
             if ($var_comment_type) {
                 $stmt_type = $var_comment_type;
 
-                \Psalm\Type\Provider::setNodeType($stmt, $var_comment_type);
-            } elseif ($stmt_expr_type = \Psalm\Type\Provider::getNodeType($stmt->expr)) {
+                $statements_analyzer->nodes->setNodeType($stmt, $var_comment_type);
+            } elseif ($stmt_expr_type = $statements_analyzer->nodes->getNodeType($stmt->expr)) {
                 $stmt_type = $stmt_expr_type;
 
                 if ($stmt_type->isNever()) {
@@ -155,7 +155,7 @@ class ReturnAnalyzer
             $stmt_type = Type::getVoid();
         }
 
-        \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+        $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
         if ($source instanceof FunctionLikeAnalyzer
             && !($source->getSource() instanceof TraitAnalyzer)

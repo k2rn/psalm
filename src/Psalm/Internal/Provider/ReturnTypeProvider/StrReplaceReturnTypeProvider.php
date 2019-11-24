@@ -31,7 +31,11 @@ class StrReplaceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnT
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
-        if ($subject_type = \Psalm\Type\Provider::getNodeType($call_args[2]->value)) {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
+        if ($subject_type = $statements_source->nodes->getNodeType($call_args[2]->value)) {
             if (!$subject_type->hasString() && $subject_type->hasArray()) {
                 return Type::getArray();
             }

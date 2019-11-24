@@ -115,7 +115,7 @@ class PropertyAssignmentAnalyzer
                 return false;
             }
 
-            $lhs_type = \Psalm\Type\Provider::getNodeType($stmt->var);
+            $lhs_type = $statements_analyzer->nodes->getNodeType($stmt->var);
 
             if ($lhs_type === null) {
                 return null;
@@ -623,7 +623,7 @@ class PropertyAssignmentAnalyzer
                             true
                         );
 
-                        $stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var);
+                        $stmt_var_type = $statements_analyzer->nodes->getNodeType($stmt->var);
 
                         $property_pure_compatible = $stmt_var_type
                             && $stmt_var_type->external_mutation_free
@@ -1068,7 +1068,7 @@ class PropertyAssignmentAnalyzer
             $statements_analyzer
         );
 
-        $fq_class_name = (string) \Psalm\Type\Provider::getNodeType($stmt->class);
+        $fq_class_name = (string) $statements_analyzer->nodes->getNodeType($stmt->class);
 
         $codebase = $statements_analyzer->getCodebase();
 

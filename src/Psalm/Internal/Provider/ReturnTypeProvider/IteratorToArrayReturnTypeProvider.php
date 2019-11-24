@@ -30,7 +30,11 @@ class IteratorToArrayReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRe
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
-        if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
+        if (($first_arg_type = $statements_source->nodes->getNodeType($call_args[0]->value))
             && $first_arg_type->hasObjectType()
         ) {
             $key_type = null;
@@ -64,7 +68,7 @@ class IteratorToArrayReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRe
 
             if ($value_type) {
                 $second_arg_type = isset($call_args[1])
-                    ? \Psalm\Type\Provider::getNodeType($call_args[1]->value)
+                    ? $statements_source->nodes->getNodeType($call_args[1]->value)
                     : null;
 
                 if ($second_arg_type

@@ -176,7 +176,7 @@ class FileAnalyzer extends SourceAnalyzer implements StatementsSource
             }
         }
 
-        $statements_analyzer = new StatementsAnalyzer($this);
+        $statements_analyzer = new StatementsAnalyzer($this, new \Psalm\Type\Provider());
 
         $leftover_stmts = $this->populateCheckers($stmts);
 
@@ -218,8 +218,6 @@ class FileAnalyzer extends SourceAnalyzer implements StatementsSource
                 }
             }
         }
-
-        \Psalm\Type\Provider::reset();
     }
 
     /**

@@ -141,14 +141,18 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
      */
     private $fake_this_class = null;
 
+    /** @var \Psalm\Type\Provider */
+    public $nodes;
+
     /**
      * @param SourceAnalyzer $source
      */
-    public function __construct(SourceAnalyzer $source)
+    public function __construct(SourceAnalyzer $source, \Psalm\Type\Provider $nodes)
     {
         $this->source = $source;
         $this->file_analyzer = $source->getFileAnalyzer();
         $this->codebase = $source->getCodebase();
+        $this->nodes = $nodes;
     }
 
     /**
@@ -190,7 +194,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                     foreach ($stmt->consts as $const) {
                         $this->setConstType(
                             $const->name->name,
-                            self::getSimpleType($codebase, $const->value, $this->getAliases(), $this)
+                            self::getSimpleType($codebase, $this->nodes, $const->value, $this->getAliases(), $this)
                                 ?: Type::getMixed(),
                             $context
                         );
@@ -201,12 +205,23 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                     && $stmt->expr->name->parts === ['define']
                     && isset($stmt->expr->args[1])
                 ) {
-                    $const_name = static::getConstName($stmt->expr->args[0]->value, $codebase, $this->getAliases());
+                    $const_name = static::getConstName(
+                        $stmt->expr->args[0]->value,
+                        $this->nodes,
+                        $codebase,
+                        $this->getAliases()
+                    );
+
                     if ($const_name !== null) {
                         $this->setConstType(
                             $const_name,
-                            self::getSimpleType($codebase, $stmt->expr->args[1]->value, $this->getAliases(), $this)
-                                ?: Type::getMixed(),
+                            self::getSimpleType(
+                                $codebase,
+                                $this->nodes,
+                                $stmt->expr->args[1]->value,
+                                $this->getAliases(),
+                                $this
+                            ) ?: Type::getMixed(),
                             $context
                         );
                     }
@@ -555,7 +570,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                     ExpressionAnalyzer::analyze($this, $expr, $context);
                     $context->inside_call = false;
 
-                    if ($expr_type = \Psalm\Type\Provider::getNodeType($expr)) {
+                    if ($expr_type = $this->nodes->getNodeType($expr)) {
                         if (CallAnalyzer::checkFunctionArgumentType(
                             $this,
                             $expr_type,
@@ -627,7 +642,11 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                     $function_context->collect_exceptions = $config->check_for_throws_docblock;
 
                     if (isset($this->function_analyzers[$function_id])) {
-                        $this->function_analyzers[$function_id]->analyze($function_context, $context);
+                        $this->function_analyzers[$function_id]->analyze(
+                            $function_context,
+                            $this->nodes,
+                            $context
+                        );
 
                         if ($config->reportIssueInFile('InvalidReturnType', $this->getFilePath())) {
                             $method_id = $this->function_analyzers[$function_id]->getMethodId();
@@ -699,7 +718,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                     if ($prop->default) {
                         ExpressionAnalyzer::analyze($this, $prop->default, $context);
 
-                        if ($prop_default_type = \Psalm\Type\Provider::getNodeType($prop->default)) {
+                        if ($prop_default_type = $this->nodes->getNodeType($prop->default)) {
                             if (PropertyAssignmentAnalyzer::analyzeInstance(
                                 $this,
                                 $prop,
@@ -727,7 +746,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 foreach ($stmt->consts as $const) {
                     ExpressionAnalyzer::analyze($this, $const->value, $context);
 
-                    if (($const_type = \Psalm\Type\Provider::getNodeType($const->value))
+                    if (($const_type = $this->nodes->getNodeType($const->value))
                         && !$const_type->hasMixed()
                     ) {
                         $codebase->classlikes->setConstantType(
@@ -826,7 +845,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                     if ($plugin_fq_class_name::afterStatementAnalysis(
                         $stmt,
                         $context,
-                        $this->getSource(),
+                        $this,
                         $codebase,
                         $file_manipulations
                     ) === false) {
@@ -1491,7 +1510,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 }
 
                 if ($comment_type
-                    && ($var_default_type = \Psalm\Type\Provider::getNodeType($var->default))
+                    && ($var_default_type = $this->nodes->getNodeType($var->default))
                     && !TypeAnalyzer::isContainedBy(
                         $codebase,
                         $var_default_type,
@@ -1542,6 +1561,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
      */
     public static function getSimpleType(
         \Psalm\Codebase $codebase,
+        \Psalm\Type\Provider $nodes,
         PhpParser\Node\Expr $stmt,
         \Psalm\Aliases $aliases,
         \Psalm\FileSource $file_source = null,
@@ -1552,6 +1572,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
             if ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Concat) {
                 $left = self::getSimpleType(
                     $codebase,
+                    $nodes,
                     $stmt->left,
                     $aliases,
                     $file_source,
@@ -1560,6 +1581,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 );
                 $right = self::getSimpleType(
                     $codebase,
+                    $nodes,
                     $stmt->right,
                     $aliases,
                     $file_source,
@@ -1608,6 +1630,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
 
             $stmt_left_type = self::getSimpleType(
                 $codebase,
+                $nodes,
                 $stmt->left,
                 $aliases,
                 $file_source,
@@ -1617,6 +1640,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
 
             $stmt_right_type = self::getSimpleType(
                 $codebase,
+                $nodes,
                 $stmt->right,
                 $aliases,
                 $file_source,
@@ -1628,12 +1652,12 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 return null;
             }
 
-            \Psalm\Type\Provider::setNodeType(
+            $nodes->setNodeType(
                 $stmt->left,
                 $stmt_left_type
             );
 
-            \Psalm\Type\Provider::setNodeType(
+            $nodes->setNodeType(
                 $stmt->right,
                 $stmt_right_type
             );
@@ -1646,6 +1670,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
             ) {
                 BinaryOpAnalyzer::analyzeNonDivArithmeticOp(
                     $file_source instanceof StatementsSource ? $file_source : null,
+                    $nodes,
                     $stmt->left,
                     $stmt->right,
                     $stmt,
@@ -1781,6 +1806,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
                 if ($item->key) {
                     $single_item_key_type = self::getSimpleType(
                         $codebase,
+                        $nodes,
                         $item->key,
                         $aliases,
                         $file_source,
@@ -1812,6 +1838,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
 
                 $single_item_value_type = self::getSimpleType(
                     $codebase,
+                    $nodes,
                     $item->value,
                     $aliases,
                     $file_source,
@@ -1924,6 +1951,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
         if ($stmt instanceof PhpParser\Node\Expr\UnaryMinus || $stmt instanceof PhpParser\Node\Expr\UnaryPlus) {
             $type_to_invert = self::getSimpleType(
                 $codebase,
+                $nodes,
                 $stmt->expr,
                 $aliases,
                 $file_source,
@@ -1966,7 +1994,7 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
 
             $this->setConstType(
                 $const->name->name,
-                \Psalm\Type\Provider::getNodeType($const->value) ?: Type::getMixed(),
+                $this->nodes->getNodeType($const->value) ?: Type::getMixed(),
                 $context
             );
         }
@@ -2167,18 +2195,22 @@ class StatementsAnalyzer extends SourceAnalyzer implements StatementsSource
      *
      * @return null|string
      */
-    public static function getConstName($first_arg_value, Codebase $codebase, Aliases $aliases)
-    {
+    public static function getConstName(
+        $first_arg_value,
+        \Psalm\Type\Provider $type_provider,
+        Codebase $codebase,
+        Aliases $aliases
+    ) {
         $const_name = null;
 
         if ($first_arg_value instanceof PhpParser\Node\Scalar\String_) {
             $const_name = $first_arg_value->value;
-        } elseif ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg_value)) {
+        } elseif ($first_arg_type = $type_provider->getNodeType($first_arg_value)) {
             if ($first_arg_type->isSingleStringLiteral()) {
                 $const_name = $first_arg_type->getSingleStringLiteral()->value;
             }
         } else {
-            $simple_type = self::getSimpleType($codebase, $first_arg_value, $aliases);
+            $simple_type = self::getSimpleType($codebase, $type_provider, $first_arg_value, $aliases);
             if ($simple_type && $simple_type->isSingleStringLiteral()) {
                 $const_name = $simple_type->getSingleStringLiteral()->value;
             }

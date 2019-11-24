@@ -27,9 +27,13 @@ class FirstArgStringReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionRet
         Context $context,
         CodeLocation $code_location
     ) {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         $return_type = Type::getString();
 
-        if (($first_arg_type = \Psalm\Type\Provider::getNodeType($call_args[0]->value))
+        if (($first_arg_type = $statements_source->nodes->getNodeType($call_args[0]->value))
              && $first_arg_type->isString()
         ) {
             return $return_type;

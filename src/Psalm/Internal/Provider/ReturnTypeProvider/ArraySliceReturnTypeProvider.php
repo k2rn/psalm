@@ -25,10 +25,14 @@ class ArraySliceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnT
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         $first_arg = isset($call_args[0]->value) ? $call_args[0]->value : null;
 
         $first_arg_array = $first_arg
-            && ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg))
+            && ($first_arg_type = $statements_source->nodes->getNodeType($first_arg))
             && $first_arg_type->hasType('array')
             && ($array_atomic_type = $first_arg_type->getTypes()['array'])
             && ($array_atomic_type instanceof Type\Atomic\TArray
@@ -42,7 +46,7 @@ class ArraySliceReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnT
         }
 
         $dont_preserve_int_keys = !isset($call_args[3]->value)
-            || (($third_arg_type = \Psalm\Type\Provider::getNodeType($call_args[3]->value))
+            || (($third_arg_type = $statements_source->nodes->getNodeType($call_args[3]->value))
                 && ((string) $third_arg_type === 'false'));
 
         $already_cloned = false;

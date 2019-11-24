@@ -191,7 +191,7 @@ class ForeachAnalyzer
             $statements_analyzer
         );
 
-        if ($stmt_expr_type = \Psalm\Type\Provider::getNodeType($stmt->expr)) {
+        if ($stmt_expr_type = $statements_analyzer->nodes->getNodeType($stmt->expr)) {
             $iterator_type = $stmt_expr_type;
         } elseif ($var_id && $context->hasVariable($var_id, $statements_analyzer)) {
             $iterator_type = $context->vars_in_scope[$var_id];
@@ -736,7 +736,7 @@ class ForeachAnalyzer
                         $statements_analyzer->removeSuppressedIssues(['PossiblyInvalidMethodCall']);
                     }
 
-                    $iterator_class_type = \Psalm\Type\Provider::getNodeType($fake_method_call) ?: null;
+                    $iterator_class_type = $statements_analyzer->nodes->getNodeType($fake_method_call) ?: null;
 
                     if ($iterator_class_type) {
                         foreach ($iterator_class_type->getTypes() as $array_atomic_type) {
@@ -856,7 +856,7 @@ class ForeachAnalyzer
                         $statements_analyzer->removeSuppressedIssues(['PossiblyInvalidMethodCall']);
                     }
 
-                    $iterator_class_type = \Psalm\Type\Provider::getNodeType($fake_method_call) ?: null;
+                    $iterator_class_type = $statements_analyzer->nodes->getNodeType($fake_method_call) ?: null;
 
                     if ($iterator_class_type && !$iterator_class_type->isMixed()) {
                         if (!$value_type) {

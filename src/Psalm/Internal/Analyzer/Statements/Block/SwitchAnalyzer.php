@@ -75,6 +75,7 @@ class SwitchAnalyzer
 
             $case_actions = $case_action_map[$i] = ScopeAnalyzer::getFinalControlActions(
                 $case->stmts,
+                $statements_analyzer->nodes,
                 $config->exit_functions,
                 true
             );
@@ -93,6 +94,10 @@ class SwitchAnalyzer
         }
 
         $switch_scope = new SwitchScope();
+
+        $was_caching_assertions = $statements_analyzer->nodes->cache_assertions;
+
+        $statements_analyzer->nodes->cache_assertions = false;
 
         for ($i = 0, $l = count($stmt->cases); $i < $l; $i++) {
             $case = $stmt->cases[$i];
@@ -157,6 +162,10 @@ class SwitchAnalyzer
                     $all_options_matched = true;
                 }
             }
+        }
+
+        if ($was_caching_assertions) {
+            $statements_analyzer->nodes->cache_assertions = true;
         }
 
         // only update vars if there is a default or all possible cases accounted for
@@ -271,7 +280,12 @@ class SwitchAnalyzer
             $case_context->inside_conditional = false;
 
             $traverser = new PhpParser\NodeTraverser;
-            $traverser->addVisitor(new \Psalm\Internal\Visitor\ConditionCloningVisitor);
+            $traverser->addVisitor(
+                new \Psalm\Internal\Visitor\ConditionCloningVisitor(
+                    $statements_analyzer->nodes
+                )
+            );
+
             /** @var PhpParser\Node\Expr */
             $switch_condition = $traverser->traverse([$stmt->cond])[0];
 
@@ -313,8 +327,8 @@ class SwitchAnalyzer
                 }
             }
 
-            if (($switch_condition_type = \Psalm\Type\Provider::getNodeType($switch_condition))
-                && ($case_cond_type = \Psalm\Type\Provider::getNodeType($case->cond))
+            if (($switch_condition_type = $statements_analyzer->nodes->getNodeType($switch_condition))
+                && ($case_cond_type = $statements_analyzer->nodes->getNodeType($case->cond))
                 && (($switch_condition_type->isString() && $case_cond_type->isString())
                     || ($switch_condition_type->isInt() && $case_cond_type->isInt())
                     || ($switch_condition_type->isFloat() && $case_cond_type->isFloat())

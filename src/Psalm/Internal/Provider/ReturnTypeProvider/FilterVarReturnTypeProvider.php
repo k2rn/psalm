@@ -24,8 +24,12 @@ class FilterVarReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnTy
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         if (isset($call_args[1])
-            && ($second_arg_type = \Psalm\Type\Provider::getNodeType($call_args[1]->value))
+            && ($second_arg_type = $statements_source->nodes->getNodeType($call_args[1]->value))
             && $second_arg_type->isSingleIntLiteral()
         ) {
             $filter_type_type = $second_arg_type->getSingleIntLiteral();
@@ -59,7 +63,7 @@ class FilterVarReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnTy
             $has_object_like = false;
 
             if (isset($call_args[2])
-                && ($third_arg_type = \Psalm\Type\Provider::getNodeType($call_args[2]->value))
+                && ($third_arg_type = $statements_source->nodes->getNodeType($call_args[2]->value))
                 && $filter_type
             ) {
                 foreach ($third_arg_type->getTypes() as $atomic_type) {

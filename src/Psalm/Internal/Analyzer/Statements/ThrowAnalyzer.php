@@ -29,7 +29,7 @@ class ThrowAnalyzer
         }
 
         if ($context->check_classes
-            && ($throw_type = \Psalm\Type\Provider::getNodeType($stmt->expr))
+            && ($throw_type = $statements_analyzer->nodes->getNodeType($stmt->expr))
             && !$throw_type->hasMixed()
         ) {
             $exception_type = new Union([new TNamedObject('Exception'), new TNamedObject('Throwable')]);

@@ -42,20 +42,20 @@ class ConstFetchAnalyzer
 
         switch (strtolower($const_name)) {
             case 'null':
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getNull());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getNull());
                 break;
 
             case 'false':
                 // false is a subtype of bool
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getFalse());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getFalse());
                 break;
 
             case 'true':
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getTrue());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getTrue());
                 break;
 
             case 'stdin':
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getResource());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getResource());
                 break;
 
             default:
@@ -66,7 +66,7 @@ class ConstFetchAnalyzer
                 );
 
                 if ($const_type) {
-                    \Psalm\Type\Provider::setNodeType($stmt, clone $const_type);
+                    $statements_analyzer->nodes->setNodeType($stmt, clone $const_type);
                 } elseif ($context->check_consts) {
                     if (IssueBuffer::accepts(
                         new UndefinedConstant(

@@ -1631,6 +1631,8 @@ class TypeAnalyzer
                 if (CallMap::inCallMap($input_type_part->value)) {
                     $args = [];
 
+                    $nodes = new \Psalm\Type\Provider();
+
                     if ($container_type_part && $container_type_part->params) {
                         foreach ($container_type_part->params as $i => $param) {
                             $arg = new \PhpParser\Node\Arg(
@@ -1638,7 +1640,7 @@ class TypeAnalyzer
                             );
 
                             if ($param->type) {
-                                \Psalm\Type\Provider::setNodeType($arg->value, $param->type);
+                                $nodes->setNodeType($arg->value, $param->type);
                             }
 
                             $args[] = $arg;
@@ -1648,7 +1650,8 @@ class TypeAnalyzer
                     $matching_callable = \Psalm\Internal\Codebase\CallMap::getCallableFromCallMapById(
                         $codebase,
                         $input_type_part->value,
-                        $args
+                        $args,
+                        $nodes
                     );
 
                     $must_use = false;

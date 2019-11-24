@@ -123,14 +123,14 @@ class ClassConstFetchAnalyzer
                 }
 
                 if ($first_part_lc === 'static') {
-                    \Psalm\Type\Provider::setNodeType(
+                    $statements_analyzer->nodes->setNodeType(
                         $stmt,
                         new Type\Union([
                             new Type\Atomic\TClassString($fq_class_name, new Type\Atomic\TNamedObject($fq_class_name))
                         ])
                     );
                 } else {
-                    \Psalm\Type\Provider::setNodeType($stmt, Type::getLiteralClassString($fq_class_name));
+                    $statements_analyzer->nodes->setNodeType($stmt, Type::getLiteralClassString($fq_class_name));
                 }
 
                 if ($codebase->store_node_types
@@ -149,7 +149,7 @@ class ClassConstFetchAnalyzer
 
             // if we're ignoring that the class doesn't exist, exit anyway
             if (!$codebase->classOrInterfaceExists($fq_class_name)) {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
 
                 return null;
             }
@@ -307,10 +307,10 @@ class ClassConstFetchAnalyzer
             if ($first_part_lc !== 'static' || $class_const_storage->final) {
                 $stmt_type = clone $class_constant_type;
 
-                \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+                $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
                 $context->vars_in_scope[$const_id] = $stmt_type;
             } else {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
             }
 
             return null;
@@ -318,7 +318,7 @@ class ClassConstFetchAnalyzer
 
         if ($stmt->name instanceof PhpParser\Node\Identifier && $stmt->name->name === 'class') {
             ExpressionAnalyzer::analyze($statements_analyzer, $stmt->class, $context);
-            $lhs_type = \Psalm\Type\Provider::getNodeType($stmt->class);
+            $lhs_type = $statements_analyzer->nodes->getNodeType($stmt->class);
 
             $class_string_types = [];
 
@@ -340,17 +340,17 @@ class ClassConstFetchAnalyzer
             }
 
             if ($has_mixed_or_object) {
-                \Psalm\Type\Provider::setNodeType($stmt, new Type\Union([new Type\Atomic\TClassString()]));
+                $statements_analyzer->nodes->setNodeType($stmt, new Type\Union([new Type\Atomic\TClassString()]));
             } elseif ($class_string_types) {
-                \Psalm\Type\Provider::setNodeType($stmt, new Type\Union($class_string_types));
+                $statements_analyzer->nodes->setNodeType($stmt, new Type\Union($class_string_types));
             } else {
-                \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+                $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
             }
 
             return;
         }
 
-        \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+        $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
 
         if (ExpressionAnalyzer::analyze($statements_analyzer, $stmt->class, $context) === false) {
             return false;

@@ -70,7 +70,7 @@ class IncludeAnalyzer
         $stmt_expr_type = null;
 
         if ($stmt->expr instanceof PhpParser\Node\Scalar\String_
-            || (($stmt_expr_type = \Psalm\Type\Provider::getNodeType($stmt->expr))
+            || (($stmt_expr_type = $statements_analyzer->nodes->getNodeType($stmt->expr))
                 && $stmt_expr_type->isSingleStringLiteral())
         ) {
             if ($stmt->expr instanceof PhpParser\Node\Scalar\String_) {
@@ -95,7 +95,12 @@ class IncludeAnalyzer
                 $path_to_file = $config->base_dir . DIRECTORY_SEPARATOR . $path_to_file;
             }
         } else {
-            $path_to_file = self::getPathTo($stmt->expr, $statements_analyzer->getFileName(), $config);
+            $path_to_file = self::getPathTo(
+                $stmt->expr,
+                $statements_analyzer->nodes,
+                $statements_analyzer->getFileName(),
+                $config
+            );
         }
 
         if ($path_to_file) {
@@ -212,8 +217,12 @@ class IncludeAnalyzer
      * @return string|null
      * @psalm-suppress MixedAssignment
      */
-    public static function getPathTo(PhpParser\Node\Expr $stmt, $file_name, Config $config)
-    {
+    public static function getPathTo(
+        PhpParser\Node\Expr $stmt,
+        ?\Psalm\Type\Provider $type_provider,
+        $file_name,
+        Config $config
+    ) {
         if (DIRECTORY_SEPARATOR === '/') {
             $is_path_relative = $file_name[0] !== DIRECTORY_SEPARATOR;
         } else {
@@ -231,7 +240,10 @@ class IncludeAnalyzer
             return $stmt->value;
         }
 
-        if (($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) && $stmt_type->isSingleStringLiteral()) {
+        if ($type_provider
+            && ($stmt_type = $type_provider->getNodeType($stmt))
+            && $stmt_type->isSingleStringLiteral()
+        ) {
             if (DIRECTORY_SEPARATOR !== '/') {
                 return str_replace(
                     '/',
@@ -254,8 +266,8 @@ class IncludeAnalyzer
                 }
             }
         } elseif ($stmt instanceof PhpParser\Node\Expr\BinaryOp\Concat) {
-            $left_string = self::getPathTo($stmt->left, $file_name, $config);
-            $right_string = self::getPathTo($stmt->right, $file_name, $config);
+            $left_string = self::getPathTo($stmt->left, $type_provider, $file_name, $config);
+            $right_string = self::getPathTo($stmt->right, $type_provider, $file_name, $config);
 
             if ($left_string && $right_string) {
                 return $left_string . $right_string;
@@ -275,7 +287,7 @@ class IncludeAnalyzer
                     }
                 }
 
-                $evaled_path = self::getPathTo($stmt->args[0]->value, $file_name, $config);
+                $evaled_path = self::getPathTo($stmt->args[0]->value, $type_provider, $file_name, $config);
 
                 if (!$evaled_path) {
                     return null;

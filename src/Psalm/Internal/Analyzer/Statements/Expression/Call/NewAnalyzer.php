@@ -109,7 +109,7 @@ class NewAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\CallAna
         } else {
             ExpressionAnalyzer::analyze($statements_analyzer, $stmt->class, $context);
 
-            if ($stmt_class_type = \Psalm\Type\Provider::getNodeType($stmt->class)) {
+            if ($stmt_class_type = $statements_analyzer->nodes->getNodeType($stmt->class)) {
                 $has_single_class = $stmt_class_type->isSingleStringLiteral();
 
                 if ($has_single_class) {
@@ -131,7 +131,7 @@ class NewAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\CallAna
 
                 foreach ($stmt_class_type->getTypes() as $lhs_type_part) {
                     if ($lhs_type_part instanceof Type\Atomic\TTemplateParamClass) {
-                        if (!\Psalm\Type\Provider::getNodeType($stmt)) {
+                        if (!$statements_analyzer->nodes->getNodeType($stmt)) {
                             $new_type_part = new Type\Atomic\TTemplateParam(
                                 $lhs_type_part->param_name,
                                 $lhs_type_part->as_type
@@ -156,7 +156,7 @@ class NewAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\CallAna
                     if ($lhs_type_part instanceof Type\Atomic\TLiteralClassString
                         || $lhs_type_part instanceof Type\Atomic\TClassString
                     ) {
-                        if (!\Psalm\Type\Provider::getNodeType($stmt)) {
+                        if (!$statements_analyzer->nodes->getNodeType($stmt)) {
                             $class_name = $lhs_type_part instanceof Type\Atomic\TClassString
                                 ? $lhs_type_part->as
                                 : $lhs_type_part->value;
@@ -247,7 +247,7 @@ class NewAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\CallAna
 
                 if (!$has_single_class) {
                     if ($new_type) {
-                        \Psalm\Type\Provider::setNodeType($stmt, $new_type);
+                        $statements_analyzer->nodes->setNodeType($stmt, $new_type);
                     }
 
                     return null;
@@ -300,7 +300,7 @@ class NewAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\CallAna
                 }
             }
 
-            \Psalm\Type\Provider::setNodeType($stmt, new Type\Union([new TNamedObject($fq_class_name)]));
+            $statements_analyzer->nodes->setNodeType($stmt, new Type\Union([new TNamedObject($fq_class_name)]));
 
             if (strtolower($fq_class_name) !== 'stdclass' &&
                 $codebase->classlikes->classExists($fq_class_name)
@@ -459,7 +459,7 @@ class NewAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\CallAna
                     }
 
                     if ($generic_param_types) {
-                        \Psalm\Type\Provider::setNodeType(
+                        $statements_analyzer->nodes->setNodeType(
                             $stmt,
                             new Type\Union([
                                 new Type\Atomic\TGenericObject(
@@ -485,7 +485,7 @@ class NewAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\CallAna
                 if ($storage->external_mutation_free) {
                     /** @psalm-suppress UndefinedPropertyAssignment */
                     $stmt->external_mutation_free = true;
-                    $stmt_type = \Psalm\Type\Provider::getNodeType($stmt);
+                    $stmt_type = $statements_analyzer->nodes->getNodeType($stmt);
 
                     if ($stmt_type) {
                         $stmt_type->external_mutation_free = true;

@@ -87,7 +87,7 @@ class ForAnalyzer
         $always_enters_loop = false;
 
         foreach ($stmt->cond as $cond) {
-            if ($cond_type = \Psalm\Type\Provider::getNodeType($cond)) {
+            if ($cond_type = $statements_analyzer->nodes->getNodeType($cond)) {
                 foreach ($cond_type->getTypes() as $iterator_type) {
                     $always_enters_loop = $iterator_type instanceof Type\Atomic\TTrue;
 

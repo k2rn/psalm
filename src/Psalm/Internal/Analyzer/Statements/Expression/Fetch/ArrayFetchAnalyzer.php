@@ -94,7 +94,7 @@ class ArrayFetchAnalyzer
         $new_offset_type = null;
 
         if ($stmt->dim) {
-            $used_key_type = \Psalm\Type\Provider::getNodeType($stmt->dim) ?: Type::getMixed();
+            $used_key_type = $statements_analyzer->nodes->getNodeType($stmt->dim) ?: Type::getMixed();
 
             $dim_var_id = ExpressionAnalyzer::getArrayVarId(
                 $stmt->dim,
@@ -118,14 +118,17 @@ class ArrayFetchAnalyzer
             && !$context->vars_in_scope[$keyed_array_var_id]->possibly_undefined
             && !$context->vars_in_scope[$keyed_array_var_id]->isVanillaMixed()
         ) {
-            \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope[$keyed_array_var_id]);
+            $statements_analyzer->nodes->setNodeType(
+                $stmt,
+                clone $context->vars_in_scope[$keyed_array_var_id]
+            );
 
             return;
         }
 
         $codebase = $statements_analyzer->getCodebase();
 
-        if ($stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var)) {
+        if ($stmt_var_type = $statements_analyzer->nodes->getNodeType($stmt->var)) {
             if ($stmt_var_type->isNull()) {
                 if (!$context->inside_isset) {
                     if (IssueBuffer::accepts(
@@ -139,10 +142,13 @@ class ArrayFetchAnalyzer
                     }
                 }
 
-                if ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
-                    \Psalm\Type\Provider::setNodeType($stmt, Type::combineUnionTypes($stmt_type, Type::getNull()));
+                if ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt)) {
+                    $statements_analyzer->nodes->setNodeType(
+                        $stmt,
+                        Type::combineUnionTypes($stmt_type, Type::getNull())
+                    );
                 } else {
-                    \Psalm\Type\Provider::setNodeType($stmt, Type::getNull());
+                    $statements_analyzer->nodes->setNodeType($stmt, Type::getNull());
                 }
 
                 return;
@@ -159,7 +165,7 @@ class ArrayFetchAnalyzer
                 null
             );
 
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
 
             if ($array_var_id === '$_GET' || $array_var_id === '$_POST' || $array_var_id === '$_COOKIE') {
                 $stmt_type->tainted = (int) Type\Union::TAINTED_INPUT;
@@ -175,7 +181,7 @@ class ArrayFetchAnalyzer
 
             if ($context->inside_isset
                 && $stmt->dim
-                && ($stmt_dim_type = \Psalm\Type\Provider::getNodeType($stmt->dim))
+                && ($stmt_dim_type = $statements_analyzer->nodes->getNodeType($stmt->dim))
                 && $stmt_var_type->hasArray()
                 && ($stmt->var instanceof PhpParser\Node\Expr\ClassConstFetch
                     || $stmt->var instanceof PhpParser\Node\Expr\ConstFetch)
@@ -228,14 +234,14 @@ class ArrayFetchAnalyzer
 
         if ($keyed_array_var_id
             && $context->hasVariable($keyed_array_var_id, $statements_analyzer)
-            && (!($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) || $stmt_type->isVanillaMixed())
+            && (!($stmt_type = $statements_analyzer->nodes->getNodeType($stmt)) || $stmt_type->isVanillaMixed())
         ) {
-            \Psalm\Type\Provider::setNodeType($stmt, $context->vars_in_scope[$keyed_array_var_id]);
+            $statements_analyzer->nodes->setNodeType($stmt, $context->vars_in_scope[$keyed_array_var_id]);
         }
 
-        if (!($stmt_type = \Psalm\Type\Provider::getNodeType($stmt))) {
+        if (!($stmt_type = $statements_analyzer->nodes->getNodeType($stmt))) {
             $stmt_type = Type::getMixed();
-            \Psalm\Type\Provider::setNodeType($stmt, $stmt_type);
+            $statements_analyzer->nodes->setNodeType($stmt, $stmt_type);
         } else {
             if ($stmt_type->possibly_undefined && !$context->inside_isset && !$context->inside_unset) {
                 if (IssueBuffer::accepts(
@@ -264,7 +270,7 @@ class ArrayFetchAnalyzer
             $context->hasVariable($keyed_array_var_id, $statements_analyzer);
         }
 
-        if ($codebase->taint && ($stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var))) {
+        if ($codebase->taint && ($stmt_var_type = $statements_analyzer->nodes->getNodeType($stmt->var))) {
             $sources = [];
             $either_tainted = 0;
 
@@ -316,7 +322,7 @@ class ArrayFetchAnalyzer
             || $stmt->dim instanceof PhpParser\Node\Scalar\LNumber
         ) {
             $key_value = $stmt->dim->value;
-        } elseif ($stmt->dim && ($stmt_dim_type = \Psalm\Type\Provider::getNodeType($stmt->dim))) {
+        } elseif ($stmt->dim && ($stmt_dim_type = $statements_analyzer->nodes->getNodeType($stmt->dim))) {
             foreach ($stmt_dim_type->getTypes() as $possible_value_type) {
                 if ($possible_value_type instanceof TLiteralString
                     || $possible_value_type instanceof TLiteralInt
@@ -1014,7 +1020,9 @@ class ArrayFetchAnalyzer
                         $statements_analyzer->removeSuppressedIssues(['PossiblyInvalidMethodCall']);
                     }
 
-                    $array_access_type = \Psalm\Type\Provider::getNodeType($fake_method_call) ?: Type::getMixed();
+                    $array_access_type = $statements_analyzer->nodes->getNodeType(
+                        $fake_method_call
+                    ) ?: Type::getMixed();
                 } else {
                     $suppressed_issues = $statements_analyzer->getSuppressedIssues();
 
@@ -1069,7 +1077,7 @@ class ArrayFetchAnalyzer
                             $context
                         );
 
-                        $array_access_type = \Psalm\Type\Provider::getNodeType($fake_get_method_call)
+                        $array_access_type = $statements_analyzer->nodes->getNodeType($fake_get_method_call)
                             ?: Type::getMixed();
                     } else {
                         $array_access_type = Type::getVoid();

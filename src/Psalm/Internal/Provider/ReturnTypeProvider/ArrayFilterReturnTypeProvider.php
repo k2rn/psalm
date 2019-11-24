@@ -34,10 +34,14 @@ class ArrayFilterReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
+        if (!$statements_source instanceof StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         $array_arg = isset($call_args[0]->value) ? $call_args[0]->value : null;
 
         $first_arg_array = $array_arg
-            && ($first_arg_type = \Psalm\Type\Provider::getNodeType($array_arg))
+            && ($first_arg_type = $statements_source->nodes->getNodeType($array_arg))
             && $first_arg_type->hasType('array')
             && ($array_atomic_type = $first_arg_type->getTypes()['array'])
             && ($array_atomic_type instanceof Type\Atomic\TArray
@@ -62,18 +66,16 @@ class ArrayFilterReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
         }
 
         if (!isset($call_args[1])) {
-            if ($statements_source instanceof StatementsAnalyzer) {
-                $inner_type = \Psalm\Internal\Type\AssertionReconciler::reconcile(
-                    '!falsy',
-                    clone $inner_type,
-                    '',
-                    $statements_source,
-                    $context->inside_loop,
-                    [],
-                    null,
-                    $statements_source->getSuppressedIssues()
-                );
-            }
+            $inner_type = \Psalm\Internal\Type\AssertionReconciler::reconcile(
+                '!falsy',
+                clone $inner_type,
+                '',
+                $statements_source,
+                $context->inside_loop,
+                [],
+                null,
+                $statements_source->getSuppressedIssues()
+            );
         } elseif (!isset($call_args[2])) {
             $function_call_arg = $call_args[1];
 
@@ -122,13 +124,16 @@ class ArrayFilterReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturn
                             $callable->return_type
                         );
 
-                        \Psalm\Type\Provider::setNodeType($second_arg_value, new Type\Union([$closure_atomic_type]));
+                        $statements_source->nodes->setNodeType(
+                            $second_arg_value,
+                            new Type\Union([$closure_atomic_type])
+                        );
                     }
                 }
             }
 
             if ($second_arg_value instanceof PhpParser\Node\Expr\Closure
-                && ($second_arg_type = \Psalm\Type\Provider::getNodeType($second_arg_value))
+                && ($second_arg_type = $statements_source->nodes->getNodeType($second_arg_value))
                 && ($closure_types = $second_arg_type->getClosureTypes())
             ) {
                 $closure_atomic_type = \reset($closure_types);

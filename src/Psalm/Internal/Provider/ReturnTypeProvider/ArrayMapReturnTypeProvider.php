@@ -34,11 +34,15 @@ class ArrayMapReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnTyp
         Context $context,
         CodeLocation $code_location
     ) : Type\Union {
+        if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer) {
+            return Type::getMixed();
+        }
+
         $array_arg = isset($call_args[1]->value) ? $call_args[1]->value : null;
 
         $array_arg_atomic_type = null;
 
-        if ($array_arg && ($array_arg_type = \Psalm\Type\Provider::getNodeType($array_arg))) {
+        if ($array_arg && ($array_arg_type = $statements_source->nodes->getNodeType($array_arg))) {
             $arg_types = $array_arg_type->getTypes();
 
             if (isset($arg_types['array'])
@@ -67,7 +71,7 @@ class ArrayMapReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnTyp
                 $generic_key_type = Type::getInt();
             }
 
-            if (($function_call_type = \Psalm\Type\Provider::getNodeType($function_call_arg->value))
+            if (($function_call_type = $statements_source->nodes->getNodeType($function_call_arg->value))
                 && ($closure_types = $function_call_type->getClosureTypes())
             ) {
                 $closure_atomic_type = \reset($closure_types);
@@ -217,11 +221,10 @@ class ArrayMapReturnTypeProvider implements \Psalm\Plugin\Hook\FunctionReturnTyp
                                     $mapping_return_type = $return_type;
                                 }
                             } else {
-                                if (!$statements_source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer
-                                    || !$codebase->functions->functionExists(
-                                        $statements_source,
-                                        $mapping_function_id_part
-                                    )
+                                if (!$codebase->functions->functionExists(
+                                    $statements_source,
+                                    $mapping_function_id_part
+                                )
                                 ) {
                                     $mapping_return_type = Type::getMixed();
                                     continue;

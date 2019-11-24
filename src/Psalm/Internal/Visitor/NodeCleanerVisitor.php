@@ -8,6 +8,13 @@ use PhpParser;
  */
 class NodeCleanerVisitor extends PhpParser\NodeVisitorAbstract implements PhpParser\NodeVisitor
 {
+    private $type_provider;
+
+    public function __construct(\Psalm\Type\Provider $type_provider)
+    {
+        $this->type_provider = $type_provider;
+    }
+
     /**
      * @param  PhpParser\Node $node
      *
@@ -16,7 +23,7 @@ class NodeCleanerVisitor extends PhpParser\NodeVisitorAbstract implements PhpPar
     public function enterNode(PhpParser\Node $node)
     {
         if ($node instanceof PhpParser\Node\Expr) {
-            \Psalm\Type\Provider::clearNodeOfTypeAndAssertions($node);
+            $this->type_provider->clearNodeOfTypeAndAssertions($node);
         }
 
         return null;

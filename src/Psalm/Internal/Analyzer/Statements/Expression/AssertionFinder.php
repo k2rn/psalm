@@ -49,14 +49,6 @@ class AssertionFinder
         bool $inside_negation = false,
         bool $cache = true
     ) {
-        if ($cache) {
-            $node_assertions = \Psalm\Type\Provider::getNodeAssertions($conditional);
-
-            if ($node_assertions !== null) {
-                return $node_assertions;
-            }
-        }
-
         $if_types = [];
 
         if ($conditional instanceof PhpParser\Node\Expr\Instanceof_) {
@@ -72,7 +64,9 @@ class AssertionFinder
                 if ($var_name) {
                     $if_types[$var_name] = [$instanceof_types];
 
-                    $var_type = \Psalm\Type\Provider::getNodeType($conditional->expr);
+                    $var_type = $source instanceof StatementsAnalyzer
+                        ? $source->nodes->getNodeType($conditional->expr)
+                        : null;
 
                     foreach ($instanceof_types as $instanceof_type) {
                         if ($instanceof_type[0] === '=') {
@@ -82,7 +76,7 @@ class AssertionFinder
                         if ($codebase
                             && $var_type
                             && $inside_negation
-                            && $source instanceof StatementsSource
+                            && $source instanceof StatementsAnalyzer
                         ) {
                             if ($codebase->interfaceExists($instanceof_type)) {
                                 continue;
@@ -124,7 +118,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -137,7 +130,6 @@ class AssertionFinder
         if ($var_name) {
             $if_types[$var_name] = [['!falsy']];
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -152,28 +144,36 @@ class AssertionFinder
                 $if_types[$var_name] = [['!falsy']];
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
         if ($conditional instanceof PhpParser\Node\Expr\BooleanNot) {
-            self::scrapeAssertions(
-                $conditional->expr,
-                $this_class_name,
-                $source,
-                $codebase,
-                !$inside_negation,
-                $cache
-            );
+            $expr_assertions = null;
 
-            $expr_assertions = \Psalm\Type\Provider::getNodeAssertions($conditional->expr);
+            if ($cache && $source instanceof StatementsAnalyzer) {
+                $expr_assertions = $source->nodes->getNodeAssertions($conditional->expr);
+            }
+
+            if ($expr_assertions === null) {
+                $expr_assertions = self::scrapeAssertions(
+                    $conditional->expr,
+                    $this_class_name,
+                    $source,
+                    $codebase,
+                    !$inside_negation,
+                    $cache
+                );
+
+                if ($cache && $source instanceof StatementsAnalyzer) {
+                    $source->nodes->setNodeAssertions($conditional->expr, $expr_assertions);
+                }
+            }
 
             if ($expr_assertions === null) {
                 throw new \UnexpectedValueException('Assertions should be set');
             }
 
             $if_types = \Psalm\Type\Algebra::negateTypes($expr_assertions);
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -211,7 +211,7 @@ class AssertionFinder
             || $conditional instanceof PhpParser\Node\Expr\BinaryOp\GreaterOrEqual
         ) {
             $count_equality_position = self::hasNonEmptyCountEqualityCheck($conditional);
-            $typed_value_position = self::hasTypedValueComparison($conditional);
+            $typed_value_position = self::hasTypedValueComparison($conditional, $source);
 
             if ($count_equality_position) {
                 if ($count_equality_position === self::ASSIGNMENT_TO_RIGHT) {
@@ -235,7 +235,6 @@ class AssertionFinder
                     }
                 }
 
-                \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
                 return $if_types;
             }
 
@@ -257,11 +256,9 @@ class AssertionFinder
                     $if_types[$var_name] = [['=isset']];
                 }
 
-                \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
                 return $if_types;
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, []);
             return [];
         }
 
@@ -269,7 +266,7 @@ class AssertionFinder
             || $conditional instanceof PhpParser\Node\Expr\BinaryOp\SmallerOrEqual
         ) {
             $count_equality_position = self::hasNonEmptyCountEqualityCheck($conditional);
-            $typed_value_position = self::hasTypedValueComparison($conditional);
+            $typed_value_position = self::hasTypedValueComparison($conditional, $source);
 
             if ($count_equality_position) {
                 if ($count_equality_position === self::ASSIGNMENT_TO_LEFT) {
@@ -289,7 +286,6 @@ class AssertionFinder
                     $if_types[$var_name] = [['=non-empty-countable']];
                 }
 
-                \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
                 return $if_types;
             }
 
@@ -311,21 +307,14 @@ class AssertionFinder
                     $if_types[$var_name] = [['=isset']];
                 }
 
-                \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
                 return $if_types;
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, []);
             return [];
         }
 
         if ($conditional instanceof PhpParser\Node\Expr\FuncCall) {
             $if_types = self::processFunctionCall($conditional, $this_class_name, $source, false);
-
-            \Psalm\Type\Provider::setNodeAssertions(
-                $conditional,
-                $if_types
-            );
 
             return $if_types;
         }
@@ -335,10 +324,6 @@ class AssertionFinder
         ) {
             $if_types = self::processCustomAssertion($conditional, $this_class_name, $source, false);
 
-            \Psalm\Type\Provider::setNodeAssertions(
-                $conditional,
-                $if_types
-            );
             return $if_types;
         }
 
@@ -353,7 +338,6 @@ class AssertionFinder
                 $if_types[$var_name] = [['empty']];
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -387,7 +371,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -419,11 +402,9 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
-        \Psalm\Type\Provider::setNodeAssertions($conditional, []);
         return [];
     }
 
@@ -431,7 +412,7 @@ class AssertionFinder
      * @param PhpParser\Node\Expr\BinaryOp\Identical|PhpParser\Node\Expr\BinaryOp\Equal $conditional
      * @param string|null $this_class_name
      *
-     * @return array<string, non-empty-list<non-empty-list<string>>>|null
+     * @return array<string, non-empty-list<non-empty-list<string>>>
      */
     private static function scrapeEqualityAssertions(
         PhpParser\Node\Expr\BinaryOp $conditional,
@@ -441,6 +422,10 @@ class AssertionFinder
         bool $inside_negation = false,
         bool $cache = true
     ) {
+        if (!$source instanceof StatementsAnalyzer) {
+            return [];
+        }
+
         $if_types = [];
 
         $null_position = self::hasNullVariable($conditional);
@@ -448,9 +433,9 @@ class AssertionFinder
         $true_position = self::hasTrueVariable($conditional);
         $empty_array_position = self::hasEmptyArrayVariable($conditional);
         $gettype_position = self::hasGetTypeCheck($conditional);
-        $getclass_position = self::hasGetClassCheck($conditional);
+        $getclass_position = self::hasGetClassCheck($conditional, $source);
         $count_equality_position = self::hasNonEmptyCountEqualityCheck($conditional);
-        $typed_value_position = self::hasTypedValueComparison($conditional);
+        $typed_value_position = self::hasTypedValueComparison($conditional, $source);
 
         if ($null_position !== null) {
             if ($null_position === self::ASSIGNMENT_TO_RIGHT) {
@@ -467,7 +452,7 @@ class AssertionFinder
                 $source
             );
 
-            $var_type = \Psalm\Type\Provider::getNodeType($base_conditional);
+            $var_type = $source->nodes->getNodeType($base_conditional);
 
             if ($var_name) {
                 if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical) {
@@ -480,7 +465,6 @@ class AssertionFinder
             if ($codebase
                 && $var_type
                 && $conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical
-                && $source instanceof StatementsSource
             ) {
                 $null_type = Type::getNull();
 
@@ -517,7 +501,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -530,7 +513,7 @@ class AssertionFinder
                 throw new \UnexpectedValueException('Unrecognised position');
             }
 
-            $var_type = \Psalm\Type\Provider::getNodeType($base_conditional);
+            $var_type = $source->nodes->getNodeType($base_conditional);
 
             if ($base_conditional instanceof PhpParser\Node\Expr\FuncCall) {
                 $if_types = self::processFunctionCall(
@@ -553,23 +536,37 @@ class AssertionFinder
                         $if_types[$var_name] = [['!falsy']];
                     }
                 } else {
-                    self::scrapeAssertions(
-                        $base_conditional,
-                        $this_class_name,
-                        $source,
-                        $codebase,
-                        $inside_negation,
-                        $cache
-                    );
+                    $base_assertions = null;
 
-                    $if_types = \Psalm\Type\Provider::getNodeAssertions($base_conditional);
+                    if ($cache) {
+                        $base_assertions = $source->nodes->getNodeAssertions($base_conditional);
+                    }
+
+                    if ($base_assertions === null) {
+                        $base_assertions = self::scrapeAssertions(
+                            $base_conditional,
+                            $this_class_name,
+                            $source,
+                            $codebase,
+                            $inside_negation,
+                            $cache
+                        );
+
+                        if ($cache) {
+                            $source->nodes->setNodeAssertions($base_conditional, $base_assertions);
+                        }
+                    }
+
+                    if ($base_assertions === null) {
+                        throw new \UnexpectedValueException('Assertions should be set');
+                    }
+
+                    $if_types = $base_assertions;
                 }
             }
 
             if ($codebase && $var_type) {
-                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical
-                    && $source instanceof StatementsSource
-                ) {
+                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical) {
                     $true_type = Type::getTrue();
 
                     if (!TypeAnalyzer::isContainedBy(
@@ -606,7 +603,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -619,7 +615,7 @@ class AssertionFinder
                 throw new \UnexpectedValueException('$false_position value');
             }
 
-            $var_type = \Psalm\Type\Provider::getNodeType($base_conditional);
+            $var_type = $source->nodes->getNodeType($base_conditional);
 
             if ($base_conditional instanceof PhpParser\Node\Expr\FuncCall) {
                 $if_types = self::processFunctionCall(
@@ -642,16 +638,26 @@ class AssertionFinder
                         $if_types[$var_name] = [['falsy']];
                     }
                 } elseif ($var_type) {
-                    self::scrapeAssertions(
-                        $base_conditional,
-                        $this_class_name,
-                        $source,
-                        $codebase,
-                        $inside_negation,
-                        $cache
-                    );
+                    $base_assertions = null;
 
-                    $base_assertions = \Psalm\Type\Provider::getNodeAssertions($base_conditional);
+                    if ($cache) {
+                        $base_assertions = $source->nodes->getNodeAssertions($base_conditional);
+                    }
+
+                    if ($base_assertions === null) {
+                        $base_assertions = self::scrapeAssertions(
+                            $base_conditional,
+                            $this_class_name,
+                            $source,
+                            $codebase,
+                            $inside_negation,
+                            $cache
+                        );
+
+                        if ($cache) {
+                            $source->nodes->setNodeAssertions($base_conditional, $base_assertions);
+                        }
+                    }
 
                     if ($base_assertions === null) {
                         throw new \UnexpectedValueException('Assertions should be set');
@@ -666,9 +672,7 @@ class AssertionFinder
             }
 
             if ($codebase && $var_type) {
-                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical
-                    && $source instanceof StatementsSource
-                ) {
+                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical) {
                     $false_type = Type::getFalse();
 
                     if (!TypeAnalyzer::isContainedBy(
@@ -705,7 +709,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -724,7 +727,7 @@ class AssertionFinder
                 $source
             );
 
-            $var_type = \Psalm\Type\Provider::getNodeType($base_conditional);
+            $var_type = $source->nodes->getNodeType($base_conditional);
 
             if ($var_name) {
                 if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical) {
@@ -737,7 +740,6 @@ class AssertionFinder
             if ($codebase
                 && $var_type
                 && $conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical
-                && $source instanceof StatementsSource
             ) {
                 $null_type = Type::getEmptyArray();
 
@@ -774,7 +776,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -799,9 +800,7 @@ class AssertionFinder
             /** @var PhpParser\Node\Scalar\String_ $string_expr */
             $var_type = $string_expr->value;
 
-            if (!isset(ClassLikeAnalyzer::GETTYPE_TYPES[$var_type])
-                && $source instanceof StatementsSource
-            ) {
+            if (!isset(ClassLikeAnalyzer::GETTYPE_TYPES[$var_type])) {
                 if (IssueBuffer::accepts(
                     new UnevaluatedCode(
                         'gettype cannot return this value',
@@ -816,7 +815,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -840,7 +838,6 @@ class AssertionFinder
                 $if_types[$var_name] = [['=non-empty-countable']];
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -879,9 +876,7 @@ class AssertionFinder
                     $var_type = null;
                 }
 
-                if ($source instanceof StatementsSource
-                    && $var_type
-                ) {
+                if ($var_type) {
                     if (ClassLikeAnalyzer::checkFullyQualifiedClassLikeName(
                         $source,
                         $var_type,
@@ -890,7 +885,6 @@ class AssertionFinder
                         false
                     ) === false
                     ) {
-                        \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
                         return $if_types;
                     }
                 }
@@ -899,7 +893,7 @@ class AssertionFinder
                     $if_types[$var_name] = [['=getclass-' . $var_type]];
                 }
             } else {
-                $type = \Psalm\Type\Provider::getNodeType($whichclass_expr);
+                $type = $source->nodes->getNodeType($whichclass_expr);
 
                 if ($type && $var_name) {
                     foreach ($type->getTypes() as $type_part) {
@@ -910,7 +904,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -923,8 +916,8 @@ class AssertionFinder
                     $source
                 );
 
-                $other_type = \Psalm\Type\Provider::getNodeType($conditional->left);
-                $var_type = \Psalm\Type\Provider::getNodeType($conditional->right);
+                $other_type = $source->nodes->getNodeType($conditional->left);
+                $var_type = $source->nodes->getNodeType($conditional->right);
             } elseif ($typed_value_position === self::ASSIGNMENT_TO_LEFT) {
                 /** @var PhpParser\Node\Expr $conditional->left */
                 $var_name = ExpressionAnalyzer::getArrayVarId(
@@ -933,8 +926,8 @@ class AssertionFinder
                     $source
                 );
 
-                $var_type = \Psalm\Type\Provider::getNodeType($conditional->left);
-                $other_type = \Psalm\Type\Provider::getNodeType($conditional->right);
+                $var_type = $source->nodes->getNodeType($conditional->left);
+                $other_type = $source->nodes->getNodeType($conditional->right);
             } else {
                 throw new \UnexpectedValueException('$typed_value_position value');
             }
@@ -959,12 +952,10 @@ class AssertionFinder
                 && $other_type
                 && $var_type
                 && $conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical
-                && $source instanceof StatementsSource
             ) {
                 $parent_source = $source->getSource();
 
-                if ($parent_source
-                    && $parent_source->getSource() instanceof \Psalm\Internal\Analyzer\TraitAnalyzer
+                if ($parent_source->getSource() instanceof \Psalm\Internal\Analyzer\TraitAnalyzer
                     && (($var_type->isSingleStringLiteral()
                             && $var_type->getSingleStringLiteral()->value === $this_class_name)
                         || ($other_type->isSingleStringLiteral()
@@ -1000,18 +991,16 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
-        $var_type = \Psalm\Type\Provider::getNodeType($conditional->left);
-        $other_type = \Psalm\Type\Provider::getNodeType($conditional->right);
+        $var_type = $source->nodes->getNodeType($conditional->left);
+        $other_type = $source->nodes->getNodeType($conditional->right);
 
         if ($codebase
             && $var_type
             && $other_type
             && $conditional instanceof PhpParser\Node\Expr\BinaryOp\Identical
-            && $source instanceof StatementsSource
         ) {
             if (!TypeAnalyzer::canExpressionTypesBeIdentical($codebase, $var_type, $other_type)) {
                 if (IssueBuffer::accepts(
@@ -1026,7 +1015,6 @@ class AssertionFinder
             }
         }
 
-        \Psalm\Type\Provider::setNodeAssertions($conditional, []);
         return [];
     }
 
@@ -1044,16 +1032,19 @@ class AssertionFinder
         bool $inside_negation = false,
         bool $cache = true
     ) {
-        $if_types = [];
+        if (!$source instanceof StatementsAnalyzer) {
+            return [];
+        }
 
+        $if_types = [];
 
         $null_position = self::hasNullVariable($conditional);
         $false_position = self::hasFalseVariable($conditional);
         $true_position = self::hasTrueVariable($conditional);
         $empty_array_position = self::hasEmptyArrayVariable($conditional);
         $gettype_position = self::hasGetTypeCheck($conditional);
-        $getclass_position = self::hasGetClassCheck($conditional);
-        $typed_value_position = self::hasTypedValueComparison($conditional);
+        $getclass_position = self::hasGetClassCheck($conditional, $source);
+        $typed_value_position = self::hasTypedValueComparison($conditional, $source);
 
         if ($null_position !== null) {
             if ($null_position === self::ASSIGNMENT_TO_RIGHT) {
@@ -1064,7 +1055,7 @@ class AssertionFinder
                 throw new \UnexpectedValueException('Bad null variable position');
             }
 
-            $var_type = \Psalm\Type\Provider::getNodeType($base_conditional);
+            $var_type = $source->nodes->getNodeType($base_conditional);
 
             $var_name = ExpressionAnalyzer::getArrayVarId(
                 $base_conditional,
@@ -1081,9 +1072,7 @@ class AssertionFinder
             }
 
             if ($codebase && $var_type) {
-                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical
-                    && $source instanceof StatementsSource
-                ) {
+                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical) {
                     $null_type = Type::getNull();
 
                     if (!TypeAnalyzer::isContainedBy(
@@ -1120,7 +1109,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -1139,7 +1127,7 @@ class AssertionFinder
                 $source
             );
 
-            $var_type = \Psalm\Type\Provider::getNodeType($base_conditional);
+            $var_type = $source->nodes->getNodeType($base_conditional);
 
             if ($var_name) {
                 if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical) {
@@ -1148,16 +1136,26 @@ class AssertionFinder
                     $if_types[$var_name] = [['!falsy']];
                 }
             } elseif ($var_type) {
-                self::scrapeAssertions(
-                    $base_conditional,
-                    $this_class_name,
-                    $source,
-                    $codebase,
-                    $inside_negation,
-                    $cache
-                );
+                $base_assertions = null;
 
-                $base_assertions = \Psalm\Type\Provider::getNodeAssertions($base_conditional);
+                if ($cache) {
+                    $base_assertions = $source->nodes->getNodeAssertions($base_conditional);
+                }
+
+                if ($base_assertions === null) {
+                    $base_assertions = self::scrapeAssertions(
+                        $base_conditional,
+                        $this_class_name,
+                        $source,
+                        $codebase,
+                        $inside_negation,
+                        $cache
+                    );
+
+                    if ($cache) {
+                        $source->nodes->setNodeAssertions($base_conditional, $base_assertions);
+                    }
+                }
 
                 if ($base_assertions === null) {
                     throw new \UnexpectedValueException('Assertions should be set');
@@ -1171,9 +1169,7 @@ class AssertionFinder
             }
 
             if ($codebase && $var_type) {
-                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical
-                    && $source instanceof StatementsSource
-                ) {
+                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical) {
                     $false_type = Type::getFalse();
 
                     if (!TypeAnalyzer::isContainedBy(
@@ -1210,7 +1206,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -1223,7 +1218,7 @@ class AssertionFinder
                 throw new \UnexpectedValueException('Bad null variable position');
             }
 
-            $var_type = \Psalm\Type\Provider::getNodeType($base_conditional);
+            $var_type = $source->nodes->getNodeType($base_conditional);
 
             if ($base_conditional instanceof PhpParser\Node\Expr\FuncCall) {
                 $if_types = self::processFunctionCall(
@@ -1246,16 +1241,26 @@ class AssertionFinder
                         $if_types[$var_name] = [['falsy']];
                     }
                 } elseif ($var_type) {
-                    self::scrapeAssertions(
-                        $base_conditional,
-                        $this_class_name,
-                        $source,
-                        $codebase,
-                        $inside_negation,
-                        $cache
-                    );
+                    $base_assertions = null;
 
-                    $base_assertions = \Psalm\Type\Provider::getNodeAssertions($base_conditional);
+                    if ($cache) {
+                        $base_assertions = $source->nodes->getNodeAssertions($base_conditional);
+                    }
+
+                    if ($base_assertions === null) {
+                        $base_assertions = self::scrapeAssertions(
+                            $base_conditional,
+                            $this_class_name,
+                            $source,
+                            $codebase,
+                            $inside_negation,
+                            $cache
+                        );
+
+                        if ($cache) {
+                            $source->nodes->setNodeAssertions($base_conditional, $base_assertions);
+                        }
+                    }
 
                     if ($base_assertions === null) {
                         throw new \UnexpectedValueException('Assertions should be set');
@@ -1270,9 +1275,7 @@ class AssertionFinder
             }
 
             if ($codebase && $var_type) {
-                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical
-                    && $source instanceof StatementsSource
-                ) {
+                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical) {
                     $true_type = Type::getTrue();
 
                     if (!TypeAnalyzer::isContainedBy(
@@ -1309,7 +1312,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -1322,7 +1324,7 @@ class AssertionFinder
                 throw new \UnexpectedValueException('Bad empty array variable position');
             }
 
-            $var_type = \Psalm\Type\Provider::getNodeType($base_conditional);
+            $var_type = $source->nodes->getNodeType($base_conditional);
 
             $var_name = ExpressionAnalyzer::getArrayVarId(
                 $base_conditional,
@@ -1339,9 +1341,7 @@ class AssertionFinder
             }
 
             if ($codebase && $var_type) {
-                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical
-                    && $source instanceof StatementsSource
-                ) {
+                if ($conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical) {
                     $empty_array_type = Type::getEmptyArray();
 
                     if (!TypeAnalyzer::isContainedBy(
@@ -1378,7 +1378,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -1428,7 +1427,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -1469,7 +1467,7 @@ class AssertionFinder
                     $var_type = null;
                 }
             } else {
-                $type = \Psalm\Type\Provider::getNodeType($whichclass_expr);
+                $type = $source->nodes->getNodeType($whichclass_expr);
 
                 if ($type && $var_name) {
                     foreach ($type->getTypes() as $type_part) {
@@ -1479,12 +1477,10 @@ class AssertionFinder
                     }
                 }
 
-                \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
                 return $if_types;
             }
 
-            if ($source instanceof StatementsSource
-                && $var_type
+            if ($var_type
                 && ClassLikeAnalyzer::checkFullyQualifiedClassLikeName(
                     $source,
                     $var_type,
@@ -1500,7 +1496,6 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
@@ -1513,8 +1508,8 @@ class AssertionFinder
                     $source
                 );
 
-                $other_type = \Psalm\Type\Provider::getNodeType($conditional->left);
-                $var_type = \Psalm\Type\Provider::getNodeType($conditional->right);
+                $other_type = $source->nodes->getNodeType($conditional->left);
+                $var_type = $source->nodes->getNodeType($conditional->right);
             } elseif ($typed_value_position === self::ASSIGNMENT_TO_LEFT) {
                 /** @var PhpParser\Node\Expr $conditional->left */
                 $var_name = ExpressionAnalyzer::getArrayVarId(
@@ -1523,8 +1518,8 @@ class AssertionFinder
                     $source
                 );
 
-                $var_type = \Psalm\Type\Provider::getNodeType($conditional->left);
-                $other_type = \Psalm\Type\Provider::getNodeType($conditional->right);
+                $var_type = $source->nodes->getNodeType($conditional->left);
+                $other_type = $source->nodes->getNodeType($conditional->right);
             } else {
                 throw new \UnexpectedValueException('$typed_value_position value');
             }
@@ -1549,12 +1544,10 @@ class AssertionFinder
                 if ($codebase
                     && $other_type
                     && $conditional instanceof PhpParser\Node\Expr\BinaryOp\NotIdentical
-                    && $source instanceof StatementsSource
                 ) {
                     $parent_source = $source->getSource();
 
-                    if ($parent_source
-                        && $parent_source->getSource() instanceof \Psalm\Internal\Analyzer\TraitAnalyzer
+                    if ($parent_source->getSource() instanceof \Psalm\Internal\Analyzer\TraitAnalyzer
                         && (($var_type->isSingleStringLiteral()
                                 && $var_type->getSingleStringLiteral()->value === $this_class_name)
                             || ($other_type->isSingleStringLiteral()
@@ -1591,11 +1584,9 @@ class AssertionFinder
                 }
             }
 
-            \Psalm\Type\Provider::setNodeAssertions($conditional, $if_types);
             return $if_types;
         }
 
-        \Psalm\Type\Provider::setNodeAssertions($conditional, []);
         return [];
     }
 
@@ -1629,7 +1620,7 @@ class AssertionFinder
             if ($first_var_name) {
                 $if_types[$first_var_name] = [[$prefix . 'null']];
             }
-        } elseif (self::hasIsACheck($expr)) {
+        } elseif (self::hasIsACheck($expr) && $source instanceof StatementsAnalyzer) {
             if ($expr->args[0]->value instanceof PhpParser\Node\Expr\ClassConstFetch
                 && $expr->args[0]->value->name instanceof PhpParser\Node\Identifier
                 && strtolower($expr->args[0]->value->name->name) === 'class'
@@ -1669,9 +1660,8 @@ class AssertionFinder
                     $first_arg = $expr->args[0]->value;
 
                     if ($first_arg
-                        && ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg))
+                        && ($first_arg_type = $source->nodes->getNodeType($first_arg))
                         && $first_arg_type->isSingleStringLiteral()
-                        && $source instanceof StatementsAnalyzer
                         && $source->getSource()->getSource() instanceof \Psalm\Internal\Analyzer\TraitAnalyzer
                         && $first_arg_type->getSingleStringLiteral()->value === $this_class_name
                     ) {
@@ -1687,9 +1677,8 @@ class AssertionFinder
                     $first_arg = $expr->args[0]->value;
 
                     if ($first_arg
-                        && ($first_arg_type = \Psalm\Type\Provider::getNodeType($first_arg))
+                        && ($first_arg_type = $source->nodes->getNodeType($first_arg))
                         && $first_arg_type->isSingleStringLiteral()
-                        && $source instanceof StatementsAnalyzer
                         && $source->getSource()->getSource() instanceof \Psalm\Internal\Analyzer\TraitAnalyzer
                         && $first_arg_type->getSingleStringLiteral()->value === $this_class_name
                     ) {
@@ -1795,9 +1784,9 @@ class AssertionFinder
             if ($first_var_name) {
                 $if_types[$first_var_name] = [[$prefix . 'hasmethod-' . $expr->args[1]->value->value]];
             }
-        } elseif (self::hasInArrayCheck($expr)) {
+        } elseif (self::hasInArrayCheck($expr) && $source instanceof StatementsAnalyzer) {
             if ($first_var_name
-                && ($second_arg_type = \Psalm\Type\Provider::getNodeType($expr->args[1]->value))
+                && ($second_arg_type = $source->nodes->getNodeType($expr->args[1]->value))
             ) {
                 foreach ($second_arg_type->getTypes() as $atomic_type) {
                     if ($atomic_type instanceof Type\Atomic\TArray
@@ -1888,8 +1877,8 @@ class AssertionFinder
             return [];
         }
 
-        $if_true_assertions = \Psalm\Type\Provider::getNodeIfTrueAssertions($expr);
-        $if_false_assertions = \Psalm\Type\Provider::getNodeIfFalseAssertions($expr);
+        $if_true_assertions = $source->nodes->getNodeIfTrueAssertions($expr);
+        $if_false_assertions = $source->nodes->getNodeIfFalseAssertions($expr);
 
         if ($if_true_assertions === null && $if_false_assertions === null) {
             return [];
@@ -2035,18 +2024,22 @@ class AssertionFinder
 
                 return [$this_class_name];
             }
-        } elseif ($stmt_class_type = \Psalm\Type\Provider::getNodeType($stmt->class)) {
-            $literal_class_strings = [];
+        } elseif ($source instanceof StatementsAnalyzer) {
+            $stmt_class_type = $source->nodes->getNodeType($stmt->class);
 
-            foreach ($stmt_class_type->getTypes() as $atomic_type) {
-                if ($atomic_type instanceof Type\Atomic\TLiteralClassString) {
-                    $literal_class_strings[] = $atomic_type->value;
-                } elseif ($atomic_type instanceof Type\Atomic\TTemplateParamClass) {
-                    $literal_class_strings[] = $atomic_type->param_name;
+            if ($stmt_class_type) {
+                $literal_class_strings = [];
+
+                foreach ($stmt_class_type->getTypes() as $atomic_type) {
+                    if ($atomic_type instanceof Type\Atomic\TLiteralClassString) {
+                        $literal_class_strings[] = $atomic_type->value;
+                    } elseif ($atomic_type instanceof Type\Atomic\TTemplateParamClass) {
+                        $literal_class_strings[] = $atomic_type->param_name;
+                    }
                 }
-            }
 
-            return $literal_class_strings;
+                return $literal_class_strings;
+            }
         }
 
         return [];
@@ -2173,8 +2166,14 @@ class AssertionFinder
      *
      * @return  false|int
      */
-    protected static function hasGetClassCheck(PhpParser\Node\Expr\BinaryOp $conditional)
-    {
+    protected static function hasGetClassCheck(
+        PhpParser\Node\Expr\BinaryOp $conditional,
+        FileSource $source
+    ) {
+        if (!$source instanceof StatementsAnalyzer) {
+            return false;
+        }
+
         $right_get_class = $conditional->right instanceof PhpParser\Node\Expr\FuncCall
             && $conditional->right->name instanceof PhpParser\Node\Name
             && strtolower($conditional->right->name->parts[0]) === 'get_class';
@@ -2190,7 +2189,7 @@ class AssertionFinder
             && $conditional->left->name instanceof PhpParser\Node\Identifier
             && strtolower($conditional->left->name->name) === 'class';
 
-        $left_type = \Psalm\Type\Provider::getNodeType($conditional->left);
+        $left_type = $source->nodes->getNodeType($conditional->left);
 
         $left_class_string_t = false;
 
@@ -2221,7 +2220,7 @@ class AssertionFinder
             && $conditional->right->name instanceof PhpParser\Node\Identifier
             && strtolower($conditional->right->name->name) === 'class';
 
-        $right_type = \Psalm\Type\Provider::getNodeType($conditional->right);
+        $right_type = $source->nodes->getNodeType($conditional->right);
 
         $right_class_string_t = false;
 
@@ -2339,9 +2338,15 @@ class AssertionFinder
      *
      * @return  false|int
      */
-    protected static function hasTypedValueComparison(PhpParser\Node\Expr\BinaryOp $conditional)
-    {
-        if (($right_type = \Psalm\Type\Provider::getNodeType($conditional->right))
+    protected static function hasTypedValueComparison(
+        PhpParser\Node\Expr\BinaryOp $conditional,
+        FileSource $source
+    ) {
+        if (!$source instanceof StatementsAnalyzer) {
+            return false;
+        }
+
+        if (($right_type = $source->nodes->getNodeType($conditional->right))
             && ((!$conditional->right instanceof PhpParser\Node\Expr\Variable
                     && !$conditional->right instanceof PhpParser\Node\Expr\PropertyFetch
                     && !$conditional->right instanceof PhpParser\Node\Expr\StaticPropertyFetch)
@@ -2354,7 +2359,7 @@ class AssertionFinder
             return self::ASSIGNMENT_TO_RIGHT;
         }
 
-        if (($left_type = \Psalm\Type\Provider::getNodeType($conditional->left))
+        if (($left_type = $source->nodes->getNodeType($conditional->left))
             && !$conditional->left instanceof PhpParser\Node\Expr\Variable
             && !$conditional->left instanceof PhpParser\Node\Expr\PropertyFetch
             && !$conditional->left instanceof PhpParser\Node\Expr\StaticPropertyFetch

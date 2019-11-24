@@ -242,7 +242,7 @@ class AssignmentAnalyzer
         if ($comment_type && $comment_type_location) {
             $temp_assign_value_type = $assign_value_type
                 ? $assign_value_type
-                : ($assign_value ? \Psalm\Type\Provider::getNodeType($assign_value) : null);
+                : ($assign_value ? $statements_analyzer->nodes->getNodeType($assign_value) : null);
 
             if ($codebase->find_unused_variables
                 && $temp_assign_value_type
@@ -266,7 +266,7 @@ class AssignmentAnalyzer
             $assign_value_type = $comment_type;
         } elseif (!$assign_value_type) {
             $assign_value_type = $assign_value
-                ? (\Psalm\Type\Provider::getNodeType($assign_value) ?: Type::getMixed())
+                ? ($statements_analyzer->nodes->getNodeType($assign_value) ?: Type::getMixed())
                 : Type::getMixed();
         }
 
@@ -443,7 +443,7 @@ class AssignmentAnalyzer
                 $var = $assign_var_item->value;
 
                 if ($assign_value instanceof PhpParser\Node\Expr\Array_
-                    && \Psalm\Type\Provider::getNodeType($assign_var_item->value)
+                    && $statements_analyzer->nodes->getNodeType($assign_var_item->value)
                 ) {
                     self::analyze(
                         $statements_analyzer,
@@ -670,7 +670,7 @@ class AssignmentAnalyzer
 
             if ($assign_var->name instanceof PhpParser\Node\Identifier) {
                 $prop_name = $assign_var->name->name;
-            } elseif (($assign_var_name_type = \Psalm\Type\Provider::getNodeType($assign_var->name))
+            } elseif (($assign_var_name_type = $statements_analyzer->nodes->getNodeType($assign_var->name))
                 && $assign_var_name_type->isSingleStringLiteral()
             ) {
                 $prop_name = $assign_var_name_type->getSingleStringLiteral()->value;
@@ -692,7 +692,7 @@ class AssignmentAnalyzer
                     return false;
                 }
 
-                if (($assign_var_type = \Psalm\Type\Provider::getNodeType($assign_var->var))
+                if (($assign_var_type = $statements_analyzer->nodes->getNodeType($assign_var->var))
                     && !$context->ignore_variable_property
                 ) {
                     $stmt_var_type = $assign_var_type;
@@ -714,7 +714,7 @@ class AssignmentAnalyzer
                 $context->vars_possibly_in_scope[$var_id] = true;
             }
 
-            $method_pure_compatible = \Psalm\Type\Provider::isPureCompatible($assign_var->var);
+            $method_pure_compatible = $statements_analyzer->nodes->isPureCompatible($assign_var->var);
 
             if (($context->mutation_free || $context->external_mutation_free)
                 && !$method_pure_compatible
@@ -841,7 +841,7 @@ class AssignmentAnalyzer
         if ($array_var_id
             && $context->mutation_free
             && $stmt->var instanceof PhpParser\Node\Expr\PropertyFetch
-            && ($stmt_var_var_type = \Psalm\Type\Provider::getNodeType($stmt->var->var))
+            && ($stmt_var_var_type = $statements_analyzer->nodes->getNodeType($stmt->var->var))
             && (!$stmt_var_var_type->external_mutation_free
                 || $stmt_var_var_type->mutation_free)
         ) {
@@ -867,10 +867,10 @@ class AssignmentAnalyzer
             $context->unreferenced_vars[$array_var_id] = [$location->getHash() => $location];
         }
 
-        $stmt_var_type = \Psalm\Type\Provider::getNodeType($stmt->var);
+        $stmt_var_type = $statements_analyzer->nodes->getNodeType($stmt->var);
         $stmt_var_type = $stmt_var_type ? clone $stmt_var_type: null;
 
-        $stmt_expr_type = \Psalm\Type\Provider::getNodeType($stmt->expr);
+        $stmt_expr_type = $statements_analyzer->nodes->getNodeType($stmt->expr);
 
         if ($stmt instanceof PhpParser\Node\Expr\AssignOp\Plus
             || $stmt instanceof PhpParser\Node\Expr\AssignOp\Minus
@@ -880,6 +880,7 @@ class AssignmentAnalyzer
         ) {
             BinaryOpAnalyzer::analyzeNonDivArithmeticOp(
                 $statements_analyzer,
+                $statements_analyzer->nodes,
                 $stmt->var,
                 $stmt->expr,
                 $stmt,
@@ -897,7 +898,7 @@ class AssignmentAnalyzer
                 );
             } elseif ($result_type && $array_var_id) {
                 $context->vars_in_scope[$array_var_id] = $result_type;
-                \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope[$array_var_id]);
+                $statements_analyzer->nodes->setNodeType($stmt, clone $context->vars_in_scope[$array_var_id]);
             }
         } elseif ($stmt instanceof PhpParser\Node\Expr\AssignOp\Div
             && $stmt_var_type
@@ -907,7 +908,7 @@ class AssignmentAnalyzer
             && $array_var_id
         ) {
             $context->vars_in_scope[$array_var_id] = Type::combineUnionTypes(Type::getFloat(), Type::getInt());
-            \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope[$array_var_id]);
+            $statements_analyzer->nodes->setNodeType($stmt, clone $context->vars_in_scope[$array_var_id]);
         } elseif ($stmt instanceof PhpParser\Node\Expr\AssignOp\Concat) {
             BinaryOpAnalyzer::analyzeConcatOp(
                 $statements_analyzer,
@@ -919,7 +920,7 @@ class AssignmentAnalyzer
 
             if ($result_type && $array_var_id) {
                 $context->vars_in_scope[$array_var_id] = $result_type;
-                \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope[$array_var_id]);
+                $statements_analyzer->nodes->setNodeType($stmt, clone $context->vars_in_scope[$array_var_id]);
             }
         } elseif ($stmt_var_type
             && $stmt_expr_type
@@ -933,6 +934,7 @@ class AssignmentAnalyzer
         ) {
             BinaryOpAnalyzer::analyzeNonDivArithmeticOp(
                 $statements_analyzer,
+                $statements_analyzer->nodes,
                 $stmt->var,
                 $stmt->expr,
                 $stmt,
@@ -942,7 +944,7 @@ class AssignmentAnalyzer
 
             if ($result_type && $array_var_id) {
                 $context->vars_in_scope[$array_var_id] = $result_type;
-                \Psalm\Type\Provider::setNodeType($stmt, clone $context->vars_in_scope[$array_var_id]);
+                $statements_analyzer->nodes->setNodeType($stmt, clone $context->vars_in_scope[$array_var_id]);
             }
         }
 

@@ -356,7 +356,10 @@ class Methods
                 $matching_callable = CallMap::getMatchingCallableFromCallMapOptions(
                     $source->getCodebase(),
                     $function_callables,
-                    $args
+                    $args,
+                    $source instanceof \Psalm\Internal\Analyzer\StatementsAnalyzer
+                        ? $source->nodes
+                        : null
                 );
 
                 assert($matching_callable->params !== null);
@@ -536,8 +539,12 @@ class Methods
      *
      * @return Type\Union|null
      */
-    public function getMethodReturnType($method_id, &$self_class, array $args = null)
-    {
+    public function getMethodReturnType(
+        $method_id,
+        &$self_class,
+        \Psalm\Internal\Analyzer\StatementsAnalyzer $statements_analyzer = null,
+        array $args = null
+    ) {
         list($original_fq_class_name, $original_method_name) = explode('::', $method_id);
 
         $original_fq_class_name = $this->classlikes->getUnAliasedName($original_fq_class_name);
@@ -580,7 +587,8 @@ class Methods
         ) {
             if ($appearing_method_id === 'Closure::fromcallable'
                 && isset($args[0])
-                && ($first_arg_type = \Psalm\Type\Provider::getNodeType($args[0]->value))
+                && $statements_analyzer
+                && ($first_arg_type = $statements_analyzer->nodes->getNodeType($args[0]->value))
                 && $first_arg_type->isSingle()
             ) {
                 foreach ($first_arg_type->getTypes() as $atomic_type) {

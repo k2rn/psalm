@@ -122,6 +122,7 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer implements Statements
      */
     public function analyze(
         Context $context,
+        \Psalm\Type\Provider $type_provider,
         Context $global_context = null,
         $add_mutations = false,
         array $byref_uses = null
@@ -321,7 +322,7 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer implements Statements
                 $closure_return_type = Type::getMixed();
             }
 
-            \Psalm\Type\Provider::setNodeType(
+            $type_provider->setNodeType(
                 $this->function,
                 new Type\Union([
                     new Type\Atomic\TFn(
@@ -339,7 +340,7 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer implements Statements
             $this->is_static = true;
         }
 
-        $statements_analyzer = new StatementsAnalyzer($this);
+        $statements_analyzer = new StatementsAnalyzer($this, $type_provider);
 
         if ($byref_uses) {
             $statements_analyzer->setByRefUses($byref_uses);
@@ -566,6 +567,7 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer implements Statements
 
             $closure_return_types = ReturnTypeCollector::getReturnTypes(
                 $codebase,
+                $type_provider,
                 $this->function->stmts,
                 $closure_yield_types,
                 $ignore_nullable_issues,
@@ -585,7 +587,7 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer implements Statements
                             $storage->return_type
                         ))
                 ) {
-                    if ($function_type = \Psalm\Type\Provider::getNodeType($this->function)) {
+                    if ($function_type = $statements_analyzer->nodes->getNodeType($this->function)) {
                         /**
                          * @psalm-suppress PossiblyUndefinedStringArrayOffset
                          * @var Type\Atomic\TFn
@@ -1017,7 +1019,7 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer implements Statements
             if ($parser_param->default) {
                 ExpressionAnalyzer::analyze($statements_analyzer, $parser_param->default, $context);
 
-                $default_type = \Psalm\Type\Provider::getNodeType($parser_param->default);
+                $default_type = $statements_analyzer->nodes->getNodeType($parser_param->default);
 
                 if ($default_type
                     && !$default_type->hasMixed()
@@ -1256,6 +1258,7 @@ abstract class FunctionLikeAnalyzer extends SourceAnalyzer implements Statements
         ReturnTypeAnalyzer::verifyReturnType(
             $this->function,
             $statements_analyzer,
+            $statements_analyzer->nodes,
             $this,
             $return_type,
             $fq_class_name,

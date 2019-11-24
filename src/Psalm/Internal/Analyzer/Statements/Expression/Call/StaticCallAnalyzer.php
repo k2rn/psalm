@@ -179,7 +179,7 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
             }
         } else {
             ExpressionAnalyzer::analyze($statements_analyzer, $stmt->class, $context);
-            $lhs_type = \Psalm\Type\Provider::getNodeType($stmt->class) ?: Type::getMixed();
+            $lhs_type = $statements_analyzer->nodes->getNodeType($stmt->class) ?: Type::getMixed();
         }
 
         if (!$lhs_type) {
@@ -442,12 +442,12 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                                     $class_storage->parent_class
                                 );
 
-                                $stmt_type = \Psalm\Type\Provider::getNodeType($stmt);
+                                $stmt_type = $statements_analyzer->nodes->getNodeType($stmt);
 
                                 if (!$stmt_type) {
-                                    \Psalm\Type\Provider::setNodeType($stmt, $return_type_candidate);
+                                    $statements_analyzer->nodes->setNodeType($stmt, $return_type_candidate);
                                 } else {
-                                    \Psalm\Type\Provider::setNodeType(
+                                    $statements_analyzer->nodes->setNodeType(
                                         $stmt,
                                         Type::combineUnionTypes(
                                             $return_type_candidate,
@@ -713,8 +713,8 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                             return false;
                         }
 
-                        if ($fake_method_call_type = \Psalm\Type\Provider::getNodeType($fake_method_call_expr)) {
-                            \Psalm\Type\Provider::setNodeType($stmt, $fake_method_call_type);
+                        if ($fake_method_call_type = $statements_analyzer->nodes->getNodeType($fake_method_call_expr)) {
+                            $statements_analyzer->nodes->setNodeType($stmt, $fake_method_call_type);
                         }
 
                         return null;
@@ -832,6 +832,7 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                     $return_type_candidate = $codebase->methods->getMethodReturnType(
                         $method_id,
                         $self_fq_class_name,
+                        $statements_analyzer,
                         $args
                     );
 
@@ -943,7 +944,7 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                     }
 
                     if ($method_storage->if_true_assertions) {
-                        \Psalm\Type\Provider::setNodeIfTrueAssertions(
+                        $statements_analyzer->nodes->setNodeIfTrueAssertions(
                             $stmt,
                             array_map(
                                 function (Assertion $assertion) use ($generic_params) : Assertion {
@@ -955,7 +956,7 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                     }
 
                     if ($method_storage->if_false_assertions) {
-                        \Psalm\Type\Provider::setNodeIfFalseAssertions(
+                        $statements_analyzer->nodes->setNodeIfFalseAssertions(
                             $stmt,
                             array_map(
                                 function (Assertion $assertion) use ($generic_params) : Assertion {
@@ -1059,13 +1060,13 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
                         $return_type_candidate->sources = [$method_source];
                     }
 
-                    if ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt)) {
-                        \Psalm\Type\Provider::setNodeType(
+                    if ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt)) {
+                        $statements_analyzer->nodes->setNodeType(
                             $stmt,
                             Type::combineUnionTypes($stmt_type, $return_type_candidate)
                         );
                     } else {
-                        \Psalm\Type\Provider::setNodeType($stmt, $return_type_candidate);
+                        $statements_analyzer->nodes->setNodeType($stmt, $return_type_candidate);
                     }
                 }
             } else {
@@ -1123,7 +1124,7 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
             if ($codebase->store_node_types
                 && !$context->collect_initializations
                 && !$context->collect_mutations
-                && ($stmt_type = \Psalm\Type\Provider::getNodeType($stmt))
+                && ($stmt_type = $statements_analyzer->nodes->getNodeType($stmt))
             ) {
                 $codebase->analyzer->addNodeType(
                     $statements_analyzer->getFilePath(),
@@ -1149,8 +1150,8 @@ class StaticCallAnalyzer extends \Psalm\Internal\Analyzer\Statements\Expression\
             $context->removeAllObjectVars();
         }
 
-        if (!\Psalm\Type\Provider::getNodeType($stmt)) {
-            \Psalm\Type\Provider::setNodeType($stmt, Type::getMixed());
+        if (!$statements_analyzer->nodes->getNodeType($stmt)) {
+            $statements_analyzer->nodes->setNodeType($stmt, Type::getMixed());
         }
     }
 }
